@@ -98,11 +98,13 @@ configuration, only database updates until then.
   `/app/logs/access.log`, a mount of its own (`.devopsy/mnt/logs`, on
   servers `shared/mnt/logs`), so it outlives containers and releases and
   stays out of the site's files: rotated at 100MiB, old files compressed, 10 kept, 90 days at
-  most (`docker/Caddyfile`). `devopsy goaccess` opens those files in
+  most (`docker/Caddyfile`). `devopsy goaccess` opens it in
   [GoAccess](https://goaccess.io), in its own container (the `goaccess`
   service, never started by `up`, built on first use), where the site runs:
-  its terminal view on a terminal, an HTML report when redirected
-  (`devopsy @prod goaccess > report.html`), or `-o json`. The service is
+  its terminal view on a terminal, which follows new requests, an HTML
+  report when redirected (`devopsy @prod goaccess > report.html`), or `-o
+  json`. Only the current file, unless `--rotated <n>` (or `all`) adds the
+  latest rotated ones; every run parses them again. The service is
   Alpine's package, not GoAccess's official image, which has no terminal
   database for the terminal view. FrankenPHP runs PHP inside
   Caddy, so a PHP request's `duration` is PHP's time; with jq, the slowest

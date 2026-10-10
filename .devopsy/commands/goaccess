@@ -1,15 +1,40 @@
 #!/bin/sh
 ## Description: The site's access log in GoAccess: its terminal view, or a report (devopsy goaccess > report.html)
-# Caddy's access log files (JSON, docker/Caddyfile) in mnt/logs, the
-# rotated ones included, through GoAccess in its own container (the goaccess
-# service): the files are the app user's, which the deploy user cannot read.
-# It runs where the site does:
+# Usage: devopsy goaccess [--rotated <n>|all] [GoAccess options...]
+#
+# Caddy's access log (JSON, docker/Caddyfile) in mnt/logs, through GoAccess
+# in its own container (the goaccess service): the files are the app user's,
+# which the deploy user cannot read. It runs where the site does:
 #   devopsy @prod goaccess                      GoAccess's terminal view (q quits)
+#   devopsy @prod goaccess --rotated 2          with the 2 latest rotated files
 #   devopsy @prod goaccess > report.html        an HTML report, on stdout
-#   devopsy @prod goaccess -o json > report.json
-# Arguments go to GoAccess. Without -o: the terminal view on a terminal,
-# HTML otherwise.
+#   devopsy @prod goaccess --rotated all -o json > report.json
+# Only the current file, access.log, unless --rotated (first) adds the
+# latest <n> rotated ones, or all. GoAccess gets files as arguments; the
+# compressed ones on stdin, which this GoAccess cannot open. Every run
+# parses them again: nothing is kept between runs. Other arguments go to
+# GoAccess. Without -o: the terminal view on a terminal, HTML otherwise.
 set -eu
+
+rotated=0
+case "${1:-}" in
+  --rotated)
+    [ $# -ge 2 ] || { echo "goaccess: --rotated needs a number, or all" >&2; exit 1; }
+    rotated=$2
+    shift 2
+    ;;
+  --rotated=*)
+    rotated=${1#--rotated=}
+    shift
+    ;;
+esac
+case $rotated in
+  all | [0-9] | [0-9][0-9]) ;;
+  *)
+    echo "goaccess: --rotated takes a number of files, or all: $rotated" >&2
+    exit 1
+    ;;
+esac
 
 output=
 for arg in "$@"; do
@@ -17,8 +42,7 @@ for arg in "$@"; do
     -o* | --output*) output=1 ;;
   esac
 done
-# The terminal view needs a terminal in the container; GoAccess reads its
-# keys from it, since the log comes in on stdin.
+# The terminal view needs a terminal in the container.
 tty=-T
 if [ -z "$output" ]; then
   if [ -t 0 ] && [ -t 1 ]; then
@@ -28,15 +52,29 @@ if [ -z "$output" ]; then
   fi
 fi
 
-# Oldest first: the rotated files (compressed once Caddy gets to them), then
-# the current one.
+# Rotated files sort by the time in their names: the latest ones, oldest
+# first. Without a terminal and with nothing to pipe, an empty stdin:
+# GoAccess reads one that is not a terminal as a log. --quiet-build: the
+# first run builds the image, and its progress would land in the report.
 # shellcheck disable=SC2016,SC2086
-exec devopsy run --rm --no-deps $tty --entrypoint sh goaccess -c '
-  for f in /logs/access-*.log.gz /logs/access-*.log /logs/access.log; do
-    [ -f "$f" ] || continue
-    case $f in
-      *.gz) zcat "$f" ;;
-      *) cat "$f" ;;
-    esac
-  done | goaccess - --log-format=CADDY --no-progress "$@"
-' sh "$@"
+exec devopsy run --rm --no-deps --quiet-build $tty --entrypoint sh goaccess -c '
+  rotated=$1
+  shift
+  plain=
+  gz=
+  if [ "$rotated" != 0 ]; then
+    [ "$rotated" = all ] && rotated=1000
+    for f in $(ls /logs/access-*.log /logs/access-*.log.gz 2>/dev/null | sort -r | head -n "$rotated"); do
+      case $f in
+        *.gz) gz="$f $gz" ;;
+        *) plain="$f $plain" ;;
+      esac
+    done
+  fi
+  if [ -n "$gz" ]; then
+    zcat $gz | goaccess $plain /logs/access.log - --log-format=CADDY --no-progress "$@"
+  else
+    [ -t 0 ] || exec </dev/null
+    goaccess $plain /logs/access.log --log-format=CADDY --no-progress "$@"
+  fi
+' sh "$rotated" "$@"
