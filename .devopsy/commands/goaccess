@@ -52,14 +52,16 @@ if [ -z "$output" ]; then
   fi
 fi
 
-# Rotated files sort by the time in their names: the latest ones, oldest
-# first. Without a terminal and with nothing to pipe, an empty stdin:
-# GoAccess reads one that is not a terminal as a log. --quiet-build: the
-# first run builds the image, and its progress would land in the report.
+# In the container: rotated files sort by the time in their names, so the
+# latest ones, oldest first. Without a terminal and with nothing to pipe,
+# an empty stdin: GoAccess reads one that is not a terminal as a log.
+# --quiet-build: when the image is gone (pruned, or never built) this run
+# builds it, and its progress would land in the report.
 # shellcheck disable=SC2016,SC2086
 exec devopsy run --rm --no-deps --quiet-build $tty --entrypoint sh goaccess -c '
   rotated=$1
   shift
+
   plain=
   gz=
   if [ "$rotated" != 0 ]; then
@@ -71,6 +73,7 @@ exec devopsy run --rm --no-deps --quiet-build $tty --entrypoint sh goaccess -c '
       esac
     done
   fi
+
   if [ -n "$gz" ]; then
     zcat $gz | goaccess $plain /logs/access.log - --log-format=CADDY --no-progress "$@"
   else

@@ -12,7 +12,9 @@ set -eu
 # Secrets first, as the release's prepare step already did: for local use.
 devopsy secrets
 
-devopsy build --pull
+# With the tools profile, so the goaccess image is built here too, not at
+# its first use.
+devopsy --profile tools build --pull
 devopsy up -d --wait --remove-orphans
 
 if ! devopsy exec -T app drush status --field=bootstrap 2>/dev/null | grep -q Successful; then
