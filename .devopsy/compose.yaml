@@ -93,6 +93,11 @@ services:
     profiles: [tools]
     image: allinurl/goaccess:1.12
     user: "10001:10001"
+    # Docker's own TERM for a terminal is xterm, 8 colors, where GoAccess
+    # draws its time columns in black: unreadable on a dark background.
+    # With 256 colors it uses a palette that shows on any.
+    environment:
+      TERM: xterm-256color
     network_mode: none
     read_only: true
     # GoAccess wants a writable working directory, even to print to stdout.
@@ -102,6 +107,19 @@ services:
     volumes:
       - ./mnt/logs:/logs:ro
       - ./goaccess.conf:/etc/goaccess.conf:ro
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
+
+  # jq for `devopsy accesslog`: it reads the access log on stdin. The
+  # official image, nothing else in it; never started by `up`, pulled at
+  # its first use.
+  jq:
+    profiles: [tools]
+    image: ghcr.io/jqlang/jq:1.8.1
+    network_mode: none
+    read_only: true
     cap_drop:
       - ALL
     security_opt:

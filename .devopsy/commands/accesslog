@@ -1,0 +1,219 @@
+#!/bin/sh
+## Description: Requests as they come, one per line, from Caddy's access log (accesslog --help)
+# Caddy's JSON access log (docker/Caddyfile) through jq in its own container
+# (the jq service): from the app container's output, as docker keeps it, or
+# with --history from the files in mnt/logs, which outlive containers and
+# releases. For totals and rankings, `devopsy goaccess`.
+set -eu
+
+usage() {
+  cat <<'USAGE'
+Usage: devopsy [@<target>] accesslog [options]
+
+Requests from the access log as they come, one per line: date and time
+(UTC), status, the seconds it took, visitor, method and URL. Ctrl-C stops.
+
+  --since <time>   start there: 10m, 2h, 3d, 2026-10-10 or
+                   2026-10-10T12:00:00, UTC (default 1m; 1h with --history)
+  --no-follow      print what there is and stop
+  --history        from the log files instead of the running container's
+                   output: past requests, also from before the last release.
+                   It never follows
+  --until <time>   with --history, stop there
+  --full           whole URLs: they are cut at 100 characters otherwise
+
+Only the requests, with every filter given:
+  --dynamic        that are not static files (goaccess.conf's extensions)
+  --drupal         answered by Drupal: pages, redirects, its JSON
+  --html           that are HTML pages
+  --min <ms>       taking at least that long: PHP's time, for Drupal's
+  --status <n>     with that status, or starting so: 404, 5 or 5xx
+  --path <regex>   whose URL matches, like '^/admin'
+
+Examples:
+  devopsy @prod accesslog --drupal --min 500
+  devopsy @prod accesslog --no-follow --since 1h --status 5xx
+  devopsy @prod accesslog --history --since 3d --until 2d --drupal --min 1000
+USAGE
+}
+
+since=
+until=
+history=false
+follow=-f
+width=100
+dynamic=false
+drupal=false
+html=false
+min=0
+status=
+status_said=
+path=
+while [ $# -gt 0 ]; do
+  case $1 in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --no-follow) follow= ;;
+    --history) history=true ;;
+    --full) width=0 ;;
+    --dynamic) dynamic=true ;;
+    --drupal) drupal=true ;;
+    --html) html=true ;;
+    --since | --until | --min | --status | --path)
+      [ $# -ge 2 ] || { echo "accesslog: $1 needs a value (accesslog --help)" >&2; exit 1; }
+      case $1 in
+        --since) since=$2 ;;
+        --until) until=$2 ;;
+        --min) min=$2 ;;
+        --status)
+          status=${2%%x*}
+          status_said=$2
+          ;;
+        --path) path=$2 ;;
+      esac
+      shift
+      ;;
+    *)
+      echo "accesslog: unknown option $1 (accesslog --help)" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+case $min in
+  '' | *[!0-9]*)
+    echo "accesslog: --min takes milliseconds: $min" >&2
+    exit 1
+    ;;
+esac
+
+# Times: an amount back from now, or a date with an optional time.
+for t in "$since" "$until"; do
+  case $t in
+    '' | [0-9][smhd] | [0-9][0-9][smhd] | [0-9][0-9][0-9][smhd]) ;;
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]) ;;
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]) ;;
+    *)
+      echo "accesslog: not a time: $t (10m, 2h, 3d, 2026-10-10, 2026-10-10T12:00:00)" >&2
+      exit 1
+      ;;
+  esac
+done
+if [ "$history" = true ]; then
+  follow=
+  since=${since:-1h}
+elif [ -n "$until" ]; then
+  echo "accesslog: --until needs --history" >&2
+  exit 1
+else
+  since=${since:-1m}
+fi
+
+# What is shown, said first: the filters, since when, and whether it follows.
+showing=
+say() { showing="${showing:+$showing, }$1"; }
+[ "$dynamic" = false ] || say "that are not static files"
+[ "$drupal" = false ] || say "answered by Drupal"
+[ "$html" = false ] || say "that are HTML pages"
+[ "$min" -eq 0 ] || say "taking $min ms or more"
+[ -z "$status" ] || say "with status $status_said"
+[ -z "$path" ] || say "with a URL matching $path"
+showing="Showing ${showing:+requests $showing}"
+[ "$showing" != "Showing " ] || showing="Showing all requests"
+showing="$showing, since $since${until:+ until $until}"
+[ "$history" = false ] || showing="$showing, from the log files"
+if [ -n "$follow" ]; then
+  showing="$showing, and new ones as they come (Ctrl-C stops)"
+fi
+
+# Static files are what GoAccess calls static: goaccess.conf's extensions,
+# also before a query string. Through the environment, to keep the list out
+# of the command devopsy says it runs.
+ACCESSLOG_STATIC="[.]($(sed -n 's/^static-file \.//p' "$DEVOPSY_PROJECT_DIR/goaccess.conf" | paste -sd '|' -))([?]|\$)"
+export ACCESSLOG_STATIC
+
+# The requests: the app container's output, or with --history the files in
+# mnt/logs, read in the goaccess service's container (it runs as their
+# owner and has zcat). There, after a first line with the two times as
+# seconds since 1970, for jq: the rotated files that can hold requests
+# between them, oldest first, then the current one. A rotated file's name
+# is the time it was closed, so it holds what came before it, and after the
+# name of the one before.
+requests() {
+  if [ "$history" = false ]; then
+    # shellcheck disable=SC2086
+    devopsy logs $follow --no-log-prefix --no-color --since "$since" app 2>/dev/null
+    return
+  fi
+  # shellcheck disable=SC2016
+  devopsy run --rm --no-deps -T --quiet-pull --entrypoint sh goaccess -c '
+    now=$(date +%s)
+    seconds() {
+      case $1 in
+        "") echo "$2" ;;
+        *s) echo $((now - ${1%s})) ;;
+        *m) echo $((now - ${1%m} * 60)) ;;
+        *h) echo $((now - ${1%h} * 3600)) ;;
+        *d) echo $((now - ${1%d} * 86400)) ;;
+        *) date -u -d "$(echo "$1" | tr T " ")" +%s ;;
+      esac
+    }
+    from=$(seconds "$1" 0)
+    to=$(seconds "$2" 9999999999)
+    printf "{\"from\":%s,\"to\":%s}\n" "$from" "$to"
+    first=$(date -u -d "@$from" +%Y-%m-%dT%H-%M-%S)
+    last=$(date -u -d "@$to" +%Y-%m-%dT%H-%M-%S)
+    before=
+    for f in $(ls /logs/access-*.log /logs/access-*.log.gz 2>/dev/null | sort); do
+      name=${f#/logs/access-}
+      name=${name%%.*}
+      if ! [ "$name" \< "$first" ] && ! [ "$before" \> "$last" ]; then
+        case $f in
+          *.gz) zcat "$f" ;;
+          *) cat "$f" ;;
+        esac
+      fi
+      before=$name
+    done
+    if ! [ "$before" \> "$last" ] && [ -f /logs/access.log ]; then
+      cat /logs/access.log
+    fi
+  ' sh "$since" "$until" 2>/dev/null
+}
+
+# jq prints the Showing line and the header itself, so they come after what
+# devopsy and compose say, right above the requests. Lines that are not
+# access log entries (Caddy's and PHP's own messages) are skipped: fromjson?
+# and the logger's name.
+# shellcheck disable=SC2016
+requests |
+  devopsy run --rm --no-deps -T --quiet-pull -e ACCESSLOG_STATIC jq -n -R -r --unbuffered \
+    --arg showing "$showing." --arg status "$status" --arg path "$path" \
+    --argjson dynamic "$dynamic" --argjson drupal "$drupal" --argjson html "$html" --argjson min "$min" \
+    --argjson width "$width" --argjson history "$history" '
+    def left(n): tostring as $s | $s + ((" " * (n - ($s | length))) // "");
+    def right(n): tostring as $s | ((" " * (n - ($s | length))) // "") + $s;
+    def cut: if $width > 0 and length > $width then .[0:$width - 3] + "..." else . end;
+    def seconds: "\(. / 1000 | floor).\(. % 1000 | tostring | "000"[length:] + .)";
+    def row: [(.[0] | left(19)), (.[1] | left(6)), (.[2] | right(8)), (.[3] | left(15)), (.[4] | left(6)), .[5]] | join("  ");
+    $showing,
+    (["DATE", "STATUS", "SECONDS", "VISITOR", "METHOD", "URL"] | row),
+    ((if $history then (input | fromjson) else {from: 0, to: 9999999999} end) as $times
+     | inputs
+     | fromjson?
+     | select((.logger // "") | startswith("http.log.access"))
+     | select(.ts >= $times.from and .ts <= $times.to)
+     | (.duration * 1000 | round) as $ms
+     | select($ms >= $min)
+     | select(($dynamic | not) or (.request.uri | test($ENV.ACCESSLOG_STATIC; "i") | not))
+     | select(($drupal | not) or (.resp_headers["X-Generator"] != null))
+     | select(($html | not) or ((.resp_headers["Content-Type"][0] // "") | startswith("text/html")))
+     | select($status == "" or (.status | tostring | startswith($status)))
+     | select($path == "" or (.request.uri | test($path)))
+     | [(.ts | strftime("%Y-%m-%d %H:%M:%S")), .status, ($ms | seconds),
+        .request.client_ip, .request.method, (.request.uri | cut)]
+     | row)
+  '

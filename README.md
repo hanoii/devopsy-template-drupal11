@@ -37,6 +37,7 @@ devopsy @prod drush uli        # a one-time login link
 devopsy @prod --shell          # bash in the app container, as the app user
 devopsy @prod --shell-host     # a shell on the server, in the current release
 devopsy @prod logs -f app
+devopsy @prod accesslog        # requests as they come (accesslog --help for filters)
 devopsy @prod goaccess         # the access log in GoAccess's terminal view (q quits)
 devopsy @prod goaccess > report.html   # or as an HTML report
 devopsy @prod --releases
@@ -108,10 +109,15 @@ configuration, only database updates until then.
   `.devopsy/goaccess.conf`: the log format and what counts as a static
   request, so "Requested Files" is pages and PHP, and `devopsy @prod
   goaccess --ignore-statics=panel` shows only those. FrankenPHP runs PHP inside
-  Caddy, so a PHP request's `duration` is PHP's time; with jq, the slowest
-  recent ones:
-  `devopsy @prod logs --no-log-prefix app | grep -F '"logger":"http.log.access' |
-  jq -r 'select(.resp_headers["X-Generator"]) | [.status, .duration, .request.uri] | @tsv' | sort -k2 -nr | head`.
+  Caddy, so a Drupal request's `duration` is PHP's time. `devopsy
+  accesslog` prints requests as they come, one per line with their
+  milliseconds, from the container's output through `jq` (the `jq` service):
+  `devopsy @prod accesslog --drupal --min 500` follows the slow ones,
+  `--dynamic` leaves static files out (the same extensions as GoAccess,
+  from `goaccess.conf`), `--status 5xx`, `--path`, `--html`; `--no-follow
+  --since 1h` for what already happened. `--history` reads the log files
+  instead, for requests from before the last release: `devopsy @prod
+  accesslog --history --since 3d --until 2d --status 5xx`.
 - **The healthcheck** requests `HEALTHCHECK_PATH` (`compose.yaml`, default
   `/robots.txt`: a static file, so only Caddy answers), and Caddy keeps
   those requests out of the access log. Change it there, or per target in
