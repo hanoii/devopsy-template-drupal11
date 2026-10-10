@@ -14,6 +14,19 @@
 		trusted_proxies static private_ranges
 	}
 
+	# The access log (the site's log, below) also goes to the logs mount
+	# (compose.yaml), where it outlives containers and releases, for `devopsy goaccess`.
+	# Caddy rotates the file at 100MiB, compresses the old ones and keeps 10
+	# of them, 90 days at most. Here, not as a second log in the site: a
+	# site without host names only logs to one.
+	log access_file {
+		output file /app/logs/access.log {
+			roll_keep_for 2160h
+		}
+		format json
+		include http.log.access
+	}
+
 	frankenphp
 }
 
@@ -21,10 +34,20 @@
 	root * /app/web
 	encode zstd br gzip
 
+	# The access log, as JSON (duration is the whole request; for PHP
+	# requests, PHP's time), to the container's output, for `devopsy logs`;
+	# the global options above also write it to a file. The container's
+	# healthcheck, every few seconds, stays out of both: HEALTHCHECK_PATH is
+	# compose.yaml's, which requests it.
 	log {
 		output stdout
-		format console
+		format json
 	}
+	@healthcheck {
+		path {$HEALTHCHECK_PATH:/robots.txt}
+		remote_ip 127.0.0.1 ::1
+	}
+	log_skip @healthcheck
 
 	# HTTP basic auth, only when SITE_BASIC_AUTH (user:password) is set:
 	# docker/entrypoint hashes it into SITE_BASIC_AUTH_USER and

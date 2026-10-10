@@ -13,7 +13,7 @@ services:
     # app user (UID 10001, set in the Dockerfile).
     read_only: true
     # The only writable paths: /tmp (also Caddy's data, see the Dockerfile)
-    # and the storage mount.
+    # and the storage and logs mounts.
     tmpfs:
       - /tmp
     environment:
@@ -25,16 +25,22 @@ services:
       # Optional HTTP basic auth for the whole site, user:password (in .env,
       # on servers shared/.env): docker/Caddyfile.
       SITE_BASIC_AUTH: ${SITE_BASIC_AUTH:-}
+      # What the healthcheck below requests, set here once: docker/Caddyfile
+      # keeps it out of the access log. A static file, so Caddy answers.
+      HEALTHCHECK_PATH: ${HEALTHCHECK_PATH:-/robots.txt}
       # drush's URL (links, drush uli), from capabilities/env/compute.
       DRUSH_OPTIONS_URI: ${DRUSH_OPTIONS_URI:-${SITE_URL:-}}
     volumes:
       - ./mnt/storage:/app/storage
+      # The access log, in a mount of its own: not part of the site's files.
+      - ./mnt/logs:/app/logs
     depends_on:
       database:
         condition: service_healthy
     healthcheck:
       # Caddy only: Drupal answers with a redirect until it is installed.
-      test: [CMD, curl, -fsS, -o, /dev/null, http://localhost:8080/robots.txt]
+      # HEALTHCHECK_PATH, the app's environment above.
+      test: [CMD-SHELL, 'curl -fsS -o /dev/null "http://localhost:8080$$HEALTHCHECK_PATH"']
       interval: 10s
       start_period: 30s
       start_interval: 1s
@@ -79,6 +85,26 @@ services:
       interval: 10s
       start_period: 60s
       start_interval: 1s
+
+  # GoAccess for `devopsy goaccess`: it reads the access log files Caddy
+  # writes in mnt/logs, as their owner, and prints a report. Never started
+  # by `up`.
+  goaccess:
+    profiles: [tools]
+    image: allinurl/goaccess:1.9.4
+    user: "10001:10001"
+    network_mode: none
+    read_only: true
+    # GoAccess wants a writable working directory, even to print to stdout.
+    working_dir: /tmp
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./mnt/logs:/logs:ro
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
 
 networks:
   traefik:

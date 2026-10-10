@@ -1,0 +1,37 @@
+#!/bin/sh
+## Description: A report of the site's access log (GoAccess): devopsy goaccess > report.html
+# Caddy's access log files (JSON, docker/Caddyfile) in mnt/logs, the
+# rotated ones included, through GoAccess in its own container (the goaccess
+# service): the files are the app user's, which the deploy user cannot read.
+# It runs where the site does, and the report comes out on stdout:
+#   devopsy @prod goaccess > report.html
+#   devopsy @prod goaccess -o json > report.json
+# Arguments go to GoAccess. HTML unless -o says otherwise.
+set -eu
+
+output=
+for arg in "$@"; do
+  case $arg in
+    -o* | --output*) output=1 ;;
+  esac
+done
+if [ -z "$output" ]; then
+  set -- "$@" -o html
+fi
+if [ -t 1 ]; then
+  echo "goaccess: the report goes to stdout: devopsy [@<target>] goaccess > report.html" >&2
+  exit 1
+fi
+
+# Oldest first: the rotated files (compressed once Caddy gets to them), then
+# the current one.
+# shellcheck disable=SC2016
+exec devopsy run --rm --no-deps -T --entrypoint sh goaccess -c '
+  for f in /logs/access-*.log.gz /logs/access-*.log /logs/access.log; do
+    [ -f "$f" ] || continue
+    case $f in
+      *.gz) zcat "$f" ;;
+      *) cat "$f" ;;
+    esac
+  done | goaccess - --log-format=CADDY --no-progress "$@"
+' sh "$@"

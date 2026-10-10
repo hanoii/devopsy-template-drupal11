@@ -1,7 +1,7 @@
 #!/bin/sh
 # Container entrypoint.
 #
-# Starts as root to prepare the storage mount (STORAGE_DIR), then drops
+# Starts as root to prepare the storage and logs mounts, then drops
 # privileges to the app user with setpriv. On servers the mount is created by
 # devopsy's deploy user, so the first start chowns it; the recursive chown runs
 # only when the content does not belong to the app user yet.
@@ -41,5 +41,10 @@ fi
 
 # Create (or fix the owner of) the mount point and its subdirectories.
 install -d -o app -g app "$STORAGE_DIR" "$STORAGE_DIR/public" "$STORAGE_DIR/private"
+
+# The access log's mount (docker/Caddyfile): docker creates it as root.
+if [ -d /app/logs ]; then
+  chown app:app /app/logs
+fi
 
 exec setpriv --reuid=app --regid=app --init-groups env HOME=/tmp "$@"

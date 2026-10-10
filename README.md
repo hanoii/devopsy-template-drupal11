@@ -37,6 +37,7 @@ devopsy @prod drush uli        # a one-time login link
 devopsy @prod --shell          # bash in the app container, as the app user
 devopsy @prod --shell-host     # a shell on the server, in the current release
 devopsy @prod logs -f app
+devopsy @prod goaccess > report.html   # a report of the access log
 devopsy @prod --releases
 devopsy @prod --destroy        # remove it all: containers, database, files (runs destroy)
 ```
@@ -65,15 +66,16 @@ configuration, only database updates until then.
   root and never 1000, the deploy user on devopsy servers. The UID is fixed in
   the image, not passed around as a setting.
 - **Read-only.** The container's root filesystem is read-only. The only
-  writable paths are `/tmp` (a tmpfs, also Caddy's state) and `/app/storage`,
+  writable paths are `/tmp` (a tmpfs, also Caddy's state), `/app/storage`,
   a bind mount of `.devopsy/mnt/storage` (on servers `shared/mnt/storage`)
-  holding public files (`sites/default/files` links there) and private files.
+  holding public files (`sites/default/files` links there) and private
+  files, and `/app/logs` (`mnt/logs`), the access log.
 - **Destroying.** `destroy`, the environments' destroy step, takes the
   containers down and empties `mnt/` from the database image as root: its
   files belong to `app` and MariaDB's user, which the deploy user cannot
   remove. Then devopsy removes the environment's directory.
 - **Ownership.** `shared/mnt` belongs to the deploy user, so the entrypoint
-  starts as root, gives `/app/storage` to `app` on the first start, and drops
+  starts as root, gives `/app/storage` and `/app/logs` to `app`, and drops
   to `app` with `setpriv`. `drush` in the image is a wrapper that does the
   same, so `devopsy exec app drush` never runs as root. `devopsy --shell`
   opens bash as `app` too: `compose exec` skips the entrypoint, so the
@@ -90,6 +92,23 @@ configuration, only database updates until then.
   entrypoint hashes the password and drops the plaintext before PHP starts;
   the healthcheck, from inside the container, skips it. Unset, the site is
   open.
+- **Access log.** Caddy logs each request as a JSON line, to the
+  container's output (`devopsy @prod logs -f app`) and to
+  `/app/logs/access.log`, a mount of its own (`.devopsy/mnt/logs`, on
+  servers `shared/mnt/logs`), so it outlives containers and releases and
+  stays out of the site's files: rotated at 100MiB, old files compressed, 10 kept, 90 days at
+  most (`docker/Caddyfile`). `devopsy goaccess` turns those files into a
+  [GoAccess](https://goaccess.io) report, in its own container (the
+  `goaccess` service, never started by `up`), where the site runs: `devopsy
+  @prod goaccess > report.html`, or `-o json`. FrankenPHP runs PHP inside
+  Caddy, so a PHP request's `duration` is PHP's time; with jq, the slowest
+  recent ones:
+  `devopsy @prod logs --no-log-prefix app | grep -F '"logger":"http.log.access' |
+  jq -r 'select(.resp_headers["X-Generator"]) | [.status, .duration, .request.uri] | @tsv' | sort -k2 -nr | head`.
+- **The healthcheck** requests `HEALTHCHECK_PATH` (`compose.yaml`, default
+  `/robots.txt`: a static file, so only Caddy answers), and Caddy keeps
+  those requests out of the access log. Change it there, or per target in
+  `.env`, and both follow.
 - **Code changes need a release.** OPcache never revalidates (the code cannot
   change), and modules are added with composer, then released.
 
