@@ -100,13 +100,14 @@ configuration, only database updates until then.
   stays out of the site's files: rotated at 100MiB, old files compressed, 10 kept, 90 days at
   most (`docker/Caddyfile`). `devopsy goaccess` opens it in
   [GoAccess](https://goaccess.io), in its own container (the `goaccess`
-  service, never started by `up`, built by `deploy`), where the site runs:
+  service, never started by `up`), where the site runs:
   its terminal view on a terminal, which follows new requests, an HTML
   report when redirected (`devopsy @prod goaccess > report.html`), or `-o
   json`. Only the current file, unless `--rotated <n>` (or `all`) adds the
-  latest rotated ones; every run parses them again. The service is
-  GoAccess's official image plus a terminal database, which it lacks for
-  the terminal view. FrankenPHP runs PHP inside
+  latest rotated ones; every run parses them again. Its settings are in
+  `.devopsy/goaccess.conf`: the log format and what counts as a static
+  request, so "Requested Files" is pages and PHP, and `devopsy @prod
+  goaccess --ignore-statics=panel` shows only those. FrankenPHP runs PHP inside
   Caddy, so a PHP request's `duration` is PHP's time; with jq, the slowest
   recent ones:
   `devopsy @prod logs --no-log-prefix app | grep -F '"logger":"http.log.access' |

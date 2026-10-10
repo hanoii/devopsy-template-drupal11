@@ -13,7 +13,9 @@
 # latest <n> rotated ones, or all. GoAccess gets files as arguments; the
 # compressed ones on stdin, which this GoAccess cannot open. Every run
 # parses them again: nothing is kept between runs. Other arguments go to
-# GoAccess. Without -o: the terminal view on a terminal, HTML otherwise.
+# GoAccess, over its settings in goaccess.conf (the log format, what counts
+# as static). Without -o: the terminal view on a terminal, HTML otherwise.
+#   devopsy @prod goaccess --ignore-statics=panel   pages and PHP only
 set -eu
 
 rotated=0
@@ -55,10 +57,9 @@ fi
 # In the container: rotated files sort by the time in their names, so the
 # latest ones, oldest first. Without a terminal and with nothing to pipe,
 # an empty stdin: GoAccess reads one that is not a terminal as a log.
-# --quiet-build: when the image is gone (pruned, or never built) this run
-# builds it, and its progress would land in the report.
+# --quiet-pull: the first run pulls the image, without its progress.
 # shellcheck disable=SC2016,SC2086
-exec devopsy run --rm --no-deps --quiet-build $tty --entrypoint sh goaccess -c '
+exec devopsy run --rm --no-deps --quiet-pull $tty --entrypoint sh goaccess -c '
   rotated=$1
   shift
 
@@ -75,9 +76,9 @@ exec devopsy run --rm --no-deps --quiet-build $tty --entrypoint sh goaccess -c '
   fi
 
   if [ -n "$gz" ]; then
-    zcat $gz | goaccess $plain /logs/access.log - --log-format=CADDY --no-progress "$@"
+    zcat $gz | goaccess $plain /logs/access.log - -p /etc/goaccess.conf --no-progress "$@"
   else
     [ -t 0 ] || exec </dev/null
-    goaccess $plain /logs/access.log --log-format=CADDY --no-progress "$@"
+    goaccess $plain /logs/access.log -p /etc/goaccess.conf --no-progress "$@"
   fi
 ' sh "$rotated" "$@"

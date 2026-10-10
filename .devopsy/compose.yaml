@@ -88,17 +88,10 @@ services:
 
   # GoAccess for `devopsy goaccess`: it reads the access log files Caddy
   # writes in mnt/logs, as their owner, and prints a report. Never started
-  # by `up`. The official image, plus Alpine's terminal database: it ships
-  # none, so its terminal view cannot start. Built by `deploy` (a few
-  # seconds, no build context), else on first use.
+  # by `up`; pulled at its first use. Its settings: goaccess.conf.
   goaccess:
     profiles: [tools]
-    build:
-      dockerfile_inline: |
-        FROM alpine:3.22 AS terminfo
-        RUN apk add --no-cache ncurses-terminfo-base
-        FROM allinurl/goaccess:1.12
-        COPY --from=terminfo /etc/terminfo /etc/terminfo
+    image: allinurl/goaccess:1.12
     user: "10001:10001"
     network_mode: none
     read_only: true
@@ -108,6 +101,7 @@ services:
       - /tmp
     volumes:
       - ./mnt/logs:/logs:ro
+      - ./goaccess.conf:/etc/goaccess.conf:ro
     cap_drop:
       - ALL
     security_opt:
