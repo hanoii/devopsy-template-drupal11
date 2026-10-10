@@ -37,7 +37,8 @@ devopsy @prod drush uli        # a one-time login link
 devopsy @prod --shell          # bash in the app container, as the app user
 devopsy @prod --shell-host     # a shell on the server, in the current release
 devopsy @prod logs -f app
-devopsy @prod goaccess > report.html   # a report of the access log
+devopsy @prod goaccess         # the access log in GoAccess's terminal view (q quits)
+devopsy @prod goaccess > report.html   # or as an HTML report
 devopsy @prod --releases
 devopsy @prod --destroy        # remove it all: containers, database, files (runs destroy)
 ```
@@ -97,10 +98,13 @@ configuration, only database updates until then.
   `/app/logs/access.log`, a mount of its own (`.devopsy/mnt/logs`, on
   servers `shared/mnt/logs`), so it outlives containers and releases and
   stays out of the site's files: rotated at 100MiB, old files compressed, 10 kept, 90 days at
-  most (`docker/Caddyfile`). `devopsy goaccess` turns those files into a
-  [GoAccess](https://goaccess.io) report, in its own container (the
-  `goaccess` service, never started by `up`), where the site runs: `devopsy
-  @prod goaccess > report.html`, or `-o json`. FrankenPHP runs PHP inside
+  most (`docker/Caddyfile`). `devopsy goaccess` opens those files in
+  [GoAccess](https://goaccess.io), in its own container (the `goaccess`
+  service, never started by `up`, built on first use), where the site runs:
+  its terminal view on a terminal, an HTML report when redirected
+  (`devopsy @prod goaccess > report.html`), or `-o json`. The service is
+  Alpine's package, not GoAccess's official image, which has no terminal
+  database for the terminal view. FrankenPHP runs PHP inside
   Caddy, so a PHP request's `duration` is PHP's time; with jq, the slowest
   recent ones:
   `devopsy @prod logs --no-log-prefix app | grep -F '"logger":"http.log.access' |
