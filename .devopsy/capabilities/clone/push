@@ -6,12 +6,18 @@
 # from their devopsy.clone labels (compose.yaml). Afterwards the child's
 # deploy runs on the copy: database updates, config import, caches.
 #
-# The files, storage and logs, are rsynced (devopsy --clone-rsync). The
-# database depends on CLONE_DATABASE, inherited by children from prod:
-# skip (the default) dumps it into the child's running database; stop
-# copies the raw datadir with the database stopped on both sides, which
-# takes prod down for the copy and needs DB_PASSWORD inherited too.
+# CLONE_DATABASE, inherited by children from prod, picks the approach:
+# stop hands the whole copy to devopsy (devopsy --clone-push --generic:
+# storage and logs rsynced, the raw datadir with the database stopped and
+# the app paused on both sides, from the devopsy.clone labels; prod is
+# down for that copy and DB_PASSWORD must be inherited too). skip, the
+# default, is this script: the files rsynced and the database dumped into
+# the child's running one.
 set -eu
+
+if [ "${CLONE_DATABASE:-skip}" = stop ]; then
+  exec devopsy --clone-push --generic
+fi
 
 # Files. Arguments given to --clone after -- go to rsync for these (like
 # --exclude=css), never for the database.
@@ -24,35 +30,6 @@ if [ -n "${DEVOPSY_CLONE_ARGS:-}" ]; then
   set +f
 fi
 devopsy --clone-rsync "$@"
-
-if [ "${CLONE_DATABASE:-skip}" = stop ]; then
-  # The raw datadir, consistent only with the database stopped. The app is
-  # paused first, so prod's visitors wait instead of getting errors, and
-  # both come back however this ends.
-  paused=
-  stopped=
-  # shellcheck disable=SC2329 # called by the trap
-  resume() {
-    status=$?
-    trap - EXIT
-    if [ -n "$stopped" ]; then
-      devopsy start --wait database || status=1
-    fi
-    if [ -n "$paused" ]; then
-      devopsy unpause app || status=1
-    fi
-    exit "$status"
-  }
-  trap resume EXIT
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
-  devopsy pause app
-  paused=1
-  stopped=1
-  devopsy stop database
-  devopsy --clone-rsync database
-  exit 0
-fi
 
 # The dump: prod keeps running, consistent through one transaction. Each
 # side's own credentials, from its database container's environment, read

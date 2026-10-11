@@ -167,9 +167,11 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   its own credentials: the child keeps its `DB_PASSWORD` and
   `DRUPAL_HASH_SALT`, since `shared/.env` is never cloned.
 - **`CLONE_DATABASE=stop`** (on prod, `devopsy @prod --vars set
-  CLONE_DATABASE`) copies the raw datadir instead, with the database
-  stopped on both sides: faster for big databases, but prod's database is
-  down for the copy (its app paused meanwhile). The default is the dump
+  CLONE_DATABASE`) leaves the whole copy to devopsy instead (the push
+  script hands over with `devopsy --clone-push --generic`): `storage`,
+  `logs` and the raw datadir rsynced, the database stopped and the app
+  paused on both sides from the `devopsy.clone` labels. Faster for big
+  databases, but prod's database is down for the copy. The default is the dump
   because a datadir carries prod's users and password hashes, and the
   image's root password is random: the child's `DB_PASSWORD` would no longer
   open it. With `stop`, add `DB_PASSWORD` to prod's `inherit:` too.

@@ -104,9 +104,10 @@ services:
       # How clones copy the database, CLONE_DATABASE (inherited by children
       # from prod, config.yaml, so both sides agree): skip, the default,
       # leaves mnt/database to capabilities/clone/push, which dumps it from
-      # the parent into the child's running database; stop copies the raw
-      # datadir with the database stopped on both sides (prod down for the
-      # copy), and then DB_PASSWORD must be inherited too: the datadir
+      # the parent into the child's running database; stop hands the whole
+      # copy to devopsy (the raw datadir, this service stopped and the app
+      # paused on both sides, prod down for the copy), and then DB_PASSWORD
+      # must be inherited too: the datadir
       # carries prod's users and passwords. Never pause: a paused database
       # flushes nothing.
       - devopsy.clone=${CLONE_DATABASE:-skip}
