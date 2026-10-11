@@ -188,12 +188,15 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
 - **The maintenance page.** The `maintenance` service (nginx as 10001,
   read-only) answers every request with `.devopsy/docker/maintenance/index.html`,
   status 503 and `Retry-After: 30`. Its router has the app's rule at
-  priority 2, below the app's, so it only answers while the app is stopped
-  or unhealthy (Traefik drops the app's router then), and the app's router
-  sends its 502 and 503 answers there too (an `errors` middleware): that
-  includes Drupal's own maintenance mode for anonymous visitors. Not during
-  a clone: a paused app keeps its router, and requests wait instead. Edit
-  the page to brand it.
+  priority 2, below the app's, so it answers at once while the app is
+  stopped (Traefik drops the app's router then). The app's router sends its
+  502 and 503 answers there too (an `errors` middleware asking for
+  `/hold.html`, the same page without `Retry-After`): the server's Traefik
+  then keeps retrying the app for a while (its `hold` plugin) before
+  showing it, so a restart or a failing start is a wait, not an error
+  page. That includes Drupal's own maintenance mode for anonymous
+  visitors. Not during a clone: a paused app keeps its router, and
+  requests wait instead. Edit the page to brand it.
 
 ## Locally
 

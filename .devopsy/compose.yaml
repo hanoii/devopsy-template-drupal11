@@ -68,9 +68,13 @@ services:
       # While the app answers 502 or 503 (starting, failing), Traefik shows
       # the maintenance service's page instead. The service must exist:
       # Traefik drops a router whose middleware points at a missing one.
+      # The page is asked for as /hold.html, which nginx serves without
+      # Retry-After: the proxy's hold plugin then keeps retrying the app
+      # before letting the page out (a Retry-After would mean "down on
+      # purpose, answer at once", which is what / says for a stopped app).
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.status=502-503
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.service=${COMPOSE_PROJECT_NAME:-app}-maintenance
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.query=/index.html
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.query=/hold.html
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=${COMPOSE_PROJECT_NAME:-app}-maintenance
       # Clones (devopsy @<child> --clone, and a child's first release):
       # paused on both sides while the data is copied. Traefik keeps the
