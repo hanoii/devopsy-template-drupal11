@@ -196,8 +196,9 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   then keeps retrying the app for a while (its `hold` plugin) before
   showing it, so a restart or a failing start is a wait, not an error
   page. That includes Drupal's own maintenance mode for anonymous
-  visitors. Not during a clone: a paused app keeps its router, and
-  requests wait instead. Edit the page to brand it.
+  visitors. During a clone the app is paused: it keeps its router, and
+  Traefik holds requests until it is back, so the page appears only when
+  the wait outlasts the server's hold limit. Edit the page to brand it.
 
 ## Locally
 

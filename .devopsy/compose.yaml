@@ -77,8 +77,9 @@ services:
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.query=/hold.html
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=${COMPOSE_PROJECT_NAME:-app}-maintenance
       # Clones (devopsy @<child> --clone, and a child's first release):
-      # paused on both sides while the data is copied. Traefik keeps the
-      # router and requests wait until it is unpaused.
+      # paused on both sides while the data is copied. The server's Traefik
+      # keeps the router and holds requests until it is unpaused (its hold
+      # plugin retries the 503 of a paused container).
       - devopsy.clone=pause
     networks: [default, traefik]
 
@@ -115,9 +116,10 @@ services:
   # 503 and Retry-After (docker/maintenance). Its router has the app's rule
   # at priority 2: Traefik prefers the app's router, whose priority is the
   # rule's length, while the app runs and is healthy, and only drops it when
-  # the app is stopped or unhealthy. A paused app (during a clone) keeps its
-  # router: requests wait instead. No devopsy.clone label: clones never
-  # stop it.
+  # the app is stopped. A paused or unhealthy app keeps its router and
+  # answers 503, which Traefik's hold plugin retries before showing this
+  # page (through the errors middleware above). No devopsy.clone label:
+  # clones never stop it.
   maintenance:
     image: nginx:1.30.2-alpine
     restart: unless-stopped
