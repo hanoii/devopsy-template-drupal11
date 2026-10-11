@@ -164,7 +164,8 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   (`.devopsy/capabilities/clone/push`, which devopsy runs on prod for
   services labeled `custom`): prod keeps running,
   `mariadb-dump --single-transaction` reads it in one transaction, and the
-  child imports it into its own running database, replacing what it had,
+  child imports it into its own database (started first: on a first
+  release nothing of the child runs yet), replacing what it had,
   only once the whole dump arrived. Each side uses its own credentials:
   the child keeps its `DB_PASSWORD` and `DRUPAL_HASH_SALT`, since
   `shared/.env` is never cloned.
