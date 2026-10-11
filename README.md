@@ -159,34 +159,32 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   ever served. Later releases keep the child's data; `--clone` copies prod
   again and runs `deploy` afterwards.
 - **What is copied:** `storage` (public and private files) and `logs`,
-  rsynced from prod's server, and the database as a dump
-  (`.devopsy/capabilities/clone/push`, which devopsy runs on prod): prod
-  keeps running, `mariadb-dump --single-transaction` reads it in one
-  transaction, and the child imports it into its own running database,
-  replacing what it had, only once the whole dump arrived. Each side uses
-  its own credentials: the child keeps its `DB_PASSWORD` and
-  `DRUPAL_HASH_SALT`, since `shared/.env` is never cloned.
-- **`CLONE_DATABASE=stop`** (on prod, `devopsy @prod --vars set
-  CLONE_DATABASE`) leaves the whole copy to devopsy instead (the push
-  script hands over with `devopsy --clone-push --generic`): `storage`,
-  `logs` and the raw datadir rsynced, the database stopped and the app
-  paused on both sides from the `devopsy.clone` labels. Faster for big
-  databases, but prod's database is down for the copy. The default is the dump
-  because a datadir carries prod's users and password hashes, and the
-  image's root password is random: the child's `DB_PASSWORD` would no longer
-  open it. With `stop`, add `DB_PASSWORD` to prod's `inherit:` too.
-  `.devopsy/.env.example` lists the settings.
+  rsynced by devopsy from prod's server (the `app` service's mounts, with
+  the app paused on both sides), and the database as a dump
+  (`.devopsy/capabilities/clone/push`, which devopsy runs on prod for
+  services labeled `custom`): prod keeps running,
+  `mariadb-dump --single-transaction` reads it in one transaction, and the
+  child imports it into its own running database, replacing what it had,
+  only once the whole dump arrived. Each side uses its own credentials:
+  the child keeps its `DB_PASSWORD` and `DRUPAL_HASH_SALT`, since
+  `shared/.env` is never cloned.
+- **A raw copy instead:** label `database` `devopsy.clone=stop` and
+  devopsy rsyncs its datadir with the database stopped on both sides.
+  Faster for big databases, but prod's database is down for the copy, and
+  the datadir carries prod's users and password hashes while the image's
+  root password is random: the child's `DB_PASSWORD` would no longer open
+  it, so add `DB_PASSWORD` to prod's `inherit:` too. The push script then
+  has nothing left to do (no `custom` service) and is not run.
 - **Inherited settings.** prod's `inherit:` names variables every child
   gets from prod's server, on its first release and every clone, prod's
-  value winning: `CLONE_DATABASE`, so both sides copy the database the
-  same way, and `SITE_BASIC_AUTH`, so copies of a closed site stay closed,
-  with prod's login.
-- **The labels** in `compose.yaml` tell devopsy what to do with each service
-  during a copy, on both sides: `devopsy.clone=pause` on `app`, frozen while
-  the data moves (Traefik keeps its router: visitors wait, then get their
-  page), and `devopsy.clone=${CLONE_DATABASE:-skip}` on `database`: `skip`
-  leaves it running for the dump, `stop` stops it for the raw copy. A
-  paused database flushes nothing, so it is never `pause`.
+  value winning: `SITE_BASIC_AUTH`, so copies of a closed site stay
+  closed, with prod's login.
+- **The labels** in `compose.yaml` tell devopsy what to do with each
+  service during a copy, on both sides (unlabeled services are left out):
+  `devopsy.clone=pause` on `app`, frozen while its mounts are copied
+  (Traefik keeps its router: visitors wait, then get their page), and
+  `devopsy.clone=custom` on `database`, the push script's. A paused
+  database flushes nothing, so it is never `pause`.
 - **The maintenance page.** The `maintenance` service (nginx as 10001,
   read-only) answers every request with `.devopsy/docker/maintenance/index.html`,
   status 503 and `Retry-After: 30`. Its router has the app's rule at

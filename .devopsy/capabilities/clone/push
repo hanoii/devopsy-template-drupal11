@@ -2,34 +2,15 @@
 # The clone capability's push (devopsy-cli's README, "Capabilities"): devopsy
 # runs it on the parent (prod), in its current release with its environment,
 # when a child is cloned (its first release, or devopsy @<child> --clone).
-# The child is ready: its app paused and its database running or stopped,
-# from their devopsy.clone labels (compose.yaml). Afterwards the child's
-# deploy runs on the copy: database updates, config import, caches.
+# The child is ready: its app paused, its database running (its own
+# devopsy.clone labels, compose.yaml). Afterwards the child's deploy runs
+# on the copy: database updates, config import, caches.
 #
-# CLONE_DATABASE, inherited by children from prod, picks the approach:
-# stop hands the whole copy to devopsy (devopsy --clone-push --generic:
-# storage and logs rsynced, the raw datadir with the database stopped and
-# the app paused on both sides, from the devopsy.clone labels; prod is
-# down for that copy and DB_PASSWORD must be inherited too). skip, the
-# default, is this script: the files rsynced and the database dumped into
-# the child's running one.
+# Only the database is this script's (devopsy.clone=custom on it in
+# compose.yaml): devopsy has already rsynced storage and logs, the app's
+# mounts, with the app paused on both sides. Arguments given to --clone
+# after -- are rsync's, not used here.
 set -eu
-
-if [ "${CLONE_DATABASE:-skip}" = stop ]; then
-  exec devopsy --clone-push --generic
-fi
-
-# Files. Arguments given to --clone after -- go to rsync for these (like
-# --exclude=css), never for the database.
-set -- storage logs
-if [ -n "${DEVOPSY_CLONE_ARGS:-}" ]; then
-  # Split on spaces, without expanding patterns like --exclude=*.css.
-  set -f
-  # shellcheck disable=SC2086
-  set -- "$@" -- $DEVOPSY_CLONE_ARGS
-  set +f
-fi
-devopsy --clone-rsync "$@"
 
 # The dump: prod keeps running, consistent through one transaction. Each
 # side's own credentials, from its database container's environment, read
