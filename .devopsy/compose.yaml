@@ -65,6 +65,17 @@ services:
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.tls.certresolver=${CERTRESOLVER:-letsencrypt1}
       # The FrankenPHP image exposes several ports: tell Traefik which one.
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}.loadbalancer.server.port=8080
+      # While the app answers 502 or 503 (starting, failing), Traefik shows
+      # the maintenance service's page instead. The service must exist:
+      # Traefik drops a router whose middleware points at a missing one.
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.status=502-503
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.service=${COMPOSE_PROJECT_NAME:-app}-maintenance
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.query=/index.html
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=${COMPOSE_PROJECT_NAME:-app}-maintenance
+      # Clones (devopsy @<child> --clone, and a child's first release):
+      # paused on both sides while the data is copied. Traefik keeps the
+      # router and requests wait until it is unpaused.
+      - devopsy.clone=pause
     networks: [default, traefik]
 
   database:
@@ -85,6 +96,48 @@ services:
       interval: 10s
       start_period: 60s
       start_interval: 1s
+    labels:
+      # How clones copy the database, CLONE_DATABASE (inherited by children
+      # from prod, config.yaml, so both sides agree): skip, the default,
+      # leaves mnt/database to capabilities/clone/push, which dumps it from
+      # the parent into the child's running database; stop copies the raw
+      # datadir with the database stopped on both sides (prod down for the
+      # copy), and then DB_PASSWORD must be inherited too: the datadir
+      # carries prod's users and passwords. Never pause: a paused database
+      # flushes nothing.
+      - devopsy.clone=${CLONE_DATABASE:-skip}
+
+  # A page for when the app is stopped, unhealthy or failing: answered with
+  # 503 and Retry-After (docker/maintenance). Its router has the app's rule
+  # at priority 2: Traefik prefers the app's router, whose priority is the
+  # rule's length, while the app runs and is healthy, and only drops it when
+  # the app is stopped or unhealthy. A paused app (during a clone) keeps its
+  # router: requests wait instead. No devopsy.clone label: clones never
+  # stop it.
+  maintenance:
+    image: nginx:1.30.2-alpine
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    # nginx directly: the image's entrypoint scripts edit its default
+    # configuration, which this service does not use.
+    entrypoint: [nginx, -c, /maintenance/nginx.conf, -g, "daemon off;"]
+    volumes:
+      - ./docker/maintenance:/maintenance:ro
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.rule=${SITE_HOST_RULE:-HostRegexp(`^app\.localhost$`)}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.tls.certresolver=${CERTRESOLVER:-letsencrypt1}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.priority=2
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.service=${COMPOSE_PROJECT_NAME:-app}-maintenance
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-maintenance.loadbalancer.server.port=8080
+    networks: [traefik]
 
   # GoAccess for `devopsy goaccess`: it reads the access log files Caddy
   # writes in mnt/logs, as their owner, and prints a report. Never started

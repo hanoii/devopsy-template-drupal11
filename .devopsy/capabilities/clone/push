@@ -1,0 +1,88 @@
+#!/bin/sh
+# The clone capability's push (devopsy-cli's README, "Capabilities"): devopsy
+# runs it on the parent (prod), in its current release with its environment,
+# when a child is cloned (its first release, or devopsy @<child> --clone).
+# The child is ready: its app paused and its database running or stopped,
+# from their devopsy.clone labels (compose.yaml). Afterwards the child's
+# deploy runs on the copy: database updates, config import, caches.
+#
+# The files, storage and logs, are rsynced (devopsy --clone-rsync). The
+# database depends on CLONE_DATABASE, inherited by children from prod:
+# skip (the default) dumps it into the child's running database; stop
+# copies the raw datadir with the database stopped on both sides, which
+# takes prod down for the copy and needs DB_PASSWORD inherited too.
+set -eu
+
+# Files. Arguments given to --clone after -- go to rsync for these (like
+# --exclude=css), never for the database.
+set -- storage logs
+if [ -n "${DEVOPSY_CLONE_ARGS:-}" ]; then
+  # Split on spaces, without expanding patterns like --exclude=*.css.
+  set -f
+  # shellcheck disable=SC2086
+  set -- "$@" -- $DEVOPSY_CLONE_ARGS
+  set +f
+fi
+devopsy --clone-rsync "$@"
+
+if [ "${CLONE_DATABASE:-skip}" = stop ]; then
+  # The raw datadir, consistent only with the database stopped. The app is
+  # paused first, so prod's visitors wait instead of getting errors, and
+  # both come back however this ends.
+  paused=
+  stopped=
+  # shellcheck disable=SC2329 # called by the trap
+  resume() {
+    status=$?
+    trap - EXIT
+    if [ -n "$stopped" ]; then
+      devopsy start --wait database || status=1
+    fi
+    if [ -n "$paused" ]; then
+      devopsy unpause app || status=1
+    fi
+    exit "$status"
+  }
+  trap resume EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  devopsy pause app
+  paused=1
+  stopped=1
+  devopsy stop database
+  devopsy --clone-rsync database
+  exit 0
+fi
+
+# The dump: prod keeps running, consistent through one transaction. Each
+# side's own credentials, from its database container's environment, read
+# inside it: no password on a command line here, and the parent's never
+# reaches the child, which keeps its own DB_PASSWORD.
+#
+# A POSIX pipeline only reports its last command, so a failed or cut dump
+# is caught on the child: it keeps the dump in its container's /tmp and
+# only imports it when it ends with mariadb-dump's last line, "-- Dump
+# completed". Until then the child's database is untouched. That costs the
+# child the dump's size on disk for a moment, and keeps the parent's disk
+# and the transport out of it.
+# shellcheck disable=SC2016
+devopsy exec -T database sh -c '
+  exec mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" \
+    --single-transaction --quick --routines --events "$MARIADB_DATABASE"
+' </dev/null | devopsy --clone-exec exec -T database sh -c '
+  set -eu
+  dump=$(mktemp)
+  trap "rm -f \"$dump\"" EXIT
+  cat >"$dump"
+  case $(tail -n 1 "$dump") in
+    "-- Dump completed"*) ;;
+    *)
+      echo "clone: the dump from the parent is incomplete; the database is left as it was" >&2
+      exit 1
+      ;;
+  esac
+  mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" \
+    -e "DROP DATABASE IF EXISTS $MARIADB_DATABASE; CREATE DATABASE $MARIADB_DATABASE"
+  mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" <"$dump"
+  echo "clone: database imported" >&2
+'

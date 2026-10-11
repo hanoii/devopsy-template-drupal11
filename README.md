@@ -141,6 +141,60 @@ devopsy exec -T app sh -c 'cd /tmp/sync && tar c .' | tar x -C config/sync
 `devopsy @prod --rollback` switches to the previous release and runs `deploy`
 there, which builds it again (from cache). Database updates are not undone.
 
+## Child environments
+
+`dev` and `pr-*` (`.devopsy/config.yaml`) are children of `prod`: copies of
+its site, each with its own containers, URL and `shared/.env`.
+
+```sh
+devopsy @dev --release           # the first release clones prod, then runs deploy
+devopsy @pr-12 --release         # one per pull request, the same way
+devopsy @dev --clone             # copy prod again (asks for the name; --yes skips)
+devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for the files
+```
+
+- **The first release clones.** After the new release goes live and before
+  `deploy`, devopsy copies prod's data into it, so `deploy` (database
+  updates, config import, caches) runs on prod's data and no empty site is
+  ever served. Later releases keep the child's data; `--clone` copies prod
+  again and runs `deploy` afterwards.
+- **What is copied:** `storage` (public and private files) and `logs`,
+  rsynced from prod's server, and the database as a dump
+  (`.devopsy/capabilities/clone/push`, which devopsy runs on prod): prod
+  keeps running, `mariadb-dump --single-transaction` reads it in one
+  transaction, and the child imports it into its own running database,
+  replacing what it had, only once the whole dump arrived. Each side uses
+  its own credentials: the child keeps its `DB_PASSWORD` and
+  `DRUPAL_HASH_SALT`, since `shared/.env` is never cloned.
+- **`CLONE_DATABASE=stop`** (on prod, `devopsy @prod --vars set
+  CLONE_DATABASE`) copies the raw datadir instead, with the database
+  stopped on both sides: faster for big databases, but prod's database is
+  down for the copy (its app paused meanwhile). The default is the dump
+  because a datadir carries prod's users and password hashes, and the
+  image's root password is random: the child's `DB_PASSWORD` would no longer
+  open it. With `stop`, add `DB_PASSWORD` to prod's `inherit:` too.
+  `.devopsy/.env.example` lists the settings.
+- **Inherited settings.** prod's `inherit:` names variables every child
+  gets from prod's server, on its first release and every clone, prod's
+  value winning: `CLONE_DATABASE`, so both sides copy the database the
+  same way, and `SITE_BASIC_AUTH`, so copies of a closed site stay closed,
+  with prod's login.
+- **The labels** in `compose.yaml` tell devopsy what to do with each service
+  during a copy, on both sides: `devopsy.clone=pause` on `app`, frozen while
+  the data moves (Traefik keeps its router: visitors wait, then get their
+  page), and `devopsy.clone=${CLONE_DATABASE:-skip}` on `database`: `skip`
+  leaves it running for the dump, `stop` stops it for the raw copy. A
+  paused database flushes nothing, so it is never `pause`.
+- **The maintenance page.** The `maintenance` service (nginx as 10001,
+  read-only) answers every request with `.devopsy/docker/maintenance/index.html`,
+  status 503 and `Retry-After: 30`. Its router has the app's rule at
+  priority 2, below the app's, so it only answers while the app is stopped
+  or unhealthy (Traefik drops the app's router then), and the app's router
+  sends its 502 and 503 answers there too (an `errors` middleware): that
+  includes Drupal's own maintenance mode for anonymous visitors. Not during
+  a clone: a paused app keeps its router, and requests wait instead. Edit
+  the page to brand it.
+
 ## Locally
 
 With a local devopsy-template-traefik, the site is at
