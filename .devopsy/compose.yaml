@@ -84,7 +84,12 @@ services:
     networks: [default, traefik]
 
   database:
-    image: mariadb:11
+    # Pinned exactly: a server keeps the image it pulled first, and a
+    # floating tag would run a different version per server, while a
+    # clone copies the datadir raw from one to another (a downgrade is
+    # unsupported). Bump it here; each server upgrades on its next
+    # release, MARIADB_AUTO_UPGRADE updating the system tables on start.
+    image: mariadb:11.8.9
     restart: unless-stopped
     # The official image starts as root to own its data directory, then runs
     # as its own mysql user (999).
@@ -93,6 +98,7 @@ services:
       MARIADB_USER: drupal
       MARIADB_PASSWORD: ${DB_PASSWORD:?run devopsy secrets to generate it}
       MARIADB_RANDOM_ROOT_PASSWORD: "1"
+      MARIADB_AUTO_UPGRADE: "1"
     command: --max-allowed-packet=64M --transaction-isolation=READ-COMMITTED
     # A clean shutdown flushes InnoDB and checkpoints, longer than Docker's
     # 10s on a busy or big database; killed meanwhile, the datadir is a

@@ -166,6 +166,9 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   later only what changed). The datadir carries prod's users and password
   hashes, and the image's root password is random, so children use prod's
   `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the child's own.
+  A raw copy needs the same MariaDB on both sides (older cannot read
+  newer), so `compose.yaml` pins the exact version: bump it there, and
+  each environment upgrades at its next release.
 - **A dump instead:** `CLONE_DATABASE=custom` on prod (`devopsy @prod
   --vars set --show CLONE_DATABASE custom`; children inherit it, so both
   sides agree) hands the database to `.devopsy/capabilities/clone/push`,
