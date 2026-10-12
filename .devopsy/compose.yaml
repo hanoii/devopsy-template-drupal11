@@ -123,15 +123,17 @@ services:
       - devopsy.clone=${CLONE_DATABASE:-stop}
 
   # A page for when the app is stopped, unhealthy or failing: answered with
-  # 503 and Retry-After (docker/maintenance). Its router has the app's rule
-  # at priority 2: Traefik prefers the app's router, whose priority is the
-  # rule's length, while the app runs and is healthy, and only drops it when
-  # the app is stopped. A paused or unhealthy app keeps its router and
-  # answers 503, which Traefik's hold plugin retries before showing this
-  # page (through the errors middleware above). No devopsy.clone label:
-  # clones never stop it.
+  # 503 and Retry-After (docker/maintenance, for any request method). Its
+  # router has the app's rule at priority 2: Traefik prefers the app's
+  # router, whose priority is the rule's length, while the app runs and is
+  # healthy, and only drops it when the app is stopped. A paused or
+  # unhealthy app keeps its router and answers 503, which Traefik's hold
+  # plugin retries before showing this page (through the errors middleware
+  # above). No devopsy.clone label: clones never stop it. The image is the
+  # one devopsy-template-traefik's own page uses: nginx built to run as a
+  # plain user, the slim variant.
   maintenance:
-    image: nginx:1.30.2-alpine
+    image: nginxinc/nginx-unprivileged:1.30.5-alpine-slim
     restart: unless-stopped
     user: "10001:10001"
     read_only: true

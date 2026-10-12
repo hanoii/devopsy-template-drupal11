@@ -194,18 +194,21 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   then get their page), and `devopsy.clone=${CLONE_DATABASE:-stop}` on
   `database`. A paused database flushes nothing, so it is never `pause`.
 - **The maintenance page.** The `maintenance` service (nginx as 10001,
-  read-only) answers every request with `.devopsy/docker/maintenance/index.html`,
-  status 503 and `Retry-After: 30`. Its router has the app's rule at
-  priority 2, below the app's, so it answers at once while the app is
-  stopped (Traefik drops the app's router then). The app's router sends its
-  502 and 503 answers there too (an `errors` middleware asking for
-  `/hold.html`, the same page without `Retry-After`): the server's Traefik
-  then keeps retrying the app for a while (its `hold` plugin) before
-  showing it, so a restart or a failing start is a wait, not an error
-  page. That includes Drupal's own maintenance mode for anonymous
-  visitors. During a clone the app is paused: it keeps its router, and
-  Traefik holds requests until it is back, so the page appears only when
-  the wait outlasts the server's hold limit. Edit the page to brand it.
+  read-only) answers every request, whatever its method, with
+  `.devopsy/docker/maintenance/index.html`, status 503 and `Retry-After:
+  30`. Its router has the app's rule at priority 2, below the app's, so it
+  answers at once while the app is stopped (Traefik drops the app's router
+  then). The app's router sends its 502 and 503 answers there too (an
+  `errors` middleware asking for `/hold.html`, the same page without
+  `Retry-After`): the server's Traefik then keeps retrying the app for a
+  while (its `hold` plugin) before showing it, so a restart or a failing
+  start is a wait, not an error page. That includes Drupal's own
+  maintenance mode for anonymous visitors. During a clone the app is
+  paused: it keeps its router, and Traefik holds requests until it is
+  back, so the page appears only when the wait outlasts the server's hold
+  limit. Edit the page to brand it. To wait through short stops as well,
+  drop `Retry-After` from `nginx.conf`: Traefik then retries this router
+  too until the app's is back or its limit passes.
 
 ## Locally
 
