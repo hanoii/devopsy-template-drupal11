@@ -22,7 +22,8 @@ devopsy --clone-exec up -d --wait database </dev/null
 # The dump: prod keeps running, consistent through one transaction. Each
 # side's own credentials, from its database container's environment, read
 # inside it: no password on a command line here, and the parent's never
-# reaches the child, which keeps its own DB_PASSWORD.
+# reaches the child, which keeps its own DB_PASSWORD (config.yaml inherits
+# it only while the database is labeled stop, for the raw copy).
 #
 # A POSIX pipeline only reports its last command, so a failed or cut dump
 # is caught on the child: it keeps the dump in its container's /tmp and
