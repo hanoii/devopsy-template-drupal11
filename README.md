@@ -184,7 +184,8 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
 - **The labels** in `compose.yaml` tell devopsy what to do with each
   service during a copy, read on each side from its own release
   (unlabeled services are left out, and the two sides must agree, hence
-  the inherited `CLONE_DATABASE`): `devopsy.clone=pause` on `app`, frozen
+  the inherited `CLONE_DATABASE`; devopsy refuses to copy a datadir under
+  a child's running database): `devopsy.clone=pause` on `app`, frozen
   while its mounts are copied (Traefik keeps its router: visitors wait,
   then get their page), and `devopsy.clone=${CLONE_DATABASE:-stop}` on
   `database`. A paused database flushes nothing, so it is never `pause`.
