@@ -94,6 +94,11 @@ services:
       MARIADB_PASSWORD: ${DB_PASSWORD:?run devopsy secrets to generate it}
       MARIADB_RANDOM_ROOT_PASSWORD: "1"
     command: --max-allowed-packet=64M --transaction-isolation=READ-COMMITTED
+    # A clean shutdown flushes InnoDB and checkpoints, longer than Docker's
+    # 10s on a busy or big database; killed meanwhile, the datadir is a
+    # crash image, recovered on the next start and copied as such by a
+    # clone. Waited for by stop, down and releases alike.
+    stop_grace_period: 2m
     volumes:
       - ./mnt/database:/var/lib/mysql
     healthcheck:
