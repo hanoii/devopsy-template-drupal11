@@ -7,10 +7,12 @@
 # release nothing of it has run, so this starts it. Afterwards the child's
 # deploy runs on the copy: database updates, config import, caches.
 #
-# Only the database is this script's (devopsy.clone=custom on it in
-# compose.yaml): devopsy has already rsynced storage and logs, the app's
-# mounts, with the app paused on both sides. Arguments given to --clone
-# after -- are rsync's, not used here.
+# Only the database is this script's, and only with CLONE_DATABASE=custom
+# on prod (compose.yaml labels it devopsy.clone=custom then; the default,
+# stop, lets devopsy rsync the datadir instead and never runs this).
+# devopsy has already rsynced storage and logs, the app's mounts, with the
+# app paused on both sides. Arguments given to --clone after -- are
+# rsync's, not used here.
 set -eu
 
 # The child's database, started when it is not running yet (a first

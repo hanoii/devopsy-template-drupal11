@@ -159,33 +159,35 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   ever served. Later releases keep the child's data; `--clone` copies prod
   again and runs `deploy` afterwards.
 - **What is copied:** `storage` (public and private files) and `logs`,
-  rsynced by devopsy from prod's server (the `app` service's mounts, with
-  the app paused on both sides), and the database as a dump
-  (`.devopsy/capabilities/clone/push`, which devopsy runs on prod for
-  services labeled `custom`): prod keeps running,
+  the `app` service's mounts, rsynced by devopsy from prod's server with
+  the app paused on both sides, and the database's datadir, rsynced with
+  the database stopped on both sides: a clean, consistent copy, and prod's
+  database is down for as long as it takes (the first time everything,
+  later only what changed). The datadir carries prod's users and password
+  hashes, and the image's root password is random, so children use prod's
+  `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the child's own.
+- **A dump instead:** `CLONE_DATABASE=custom` on prod (`devopsy @prod
+  --vars set --show CLONE_DATABASE custom`; children inherit it, so both
+  sides agree) hands the database to `.devopsy/capabilities/clone/push`,
+  which devopsy runs on prod after copying the files: prod keeps running,
   `mariadb-dump --single-transaction` reads it in one transaction, and the
   child imports it into its own database (started first: on a first
-  release nothing of the child runs yet), replacing what it had,
-  only once the whole dump arrived. Each side uses its own credentials:
-  the child keeps its `DB_PASSWORD` and `DRUPAL_HASH_SALT`, since
-  `shared/.env` is never cloned.
-- **A raw copy instead:** label `database` `devopsy.clone=stop` and
-  devopsy rsyncs its datadir with the database stopped on both sides.
-  Faster for big databases, but prod's database is down for the copy, and
-  the datadir carries prod's users and password hashes while the image's
-  root password is random: the child's `DB_PASSWORD` would no longer open
-  it, so add `DB_PASSWORD` to prod's `inherit:` too. The push script then
-  has nothing left to do (no `custom` service) and is not run.
+  release nothing of the child runs yet), replacing what it had, only once
+  the whole dump arrived. Slower for big databases, no downtime on prod.
+  The script is also the example of a `custom` service for your own
+  services.
 - **Inherited settings.** prod's `inherit:` names variables every child
   gets from prod's server, on its first release and every clone, prod's
-  value winning: `SITE_BASIC_AUTH`, so copies of a closed site stay
-  closed, with prod's login.
+  value winning: `CLONE_DATABASE` and `DB_PASSWORD` (above), and
+  `SITE_BASIC_AUTH`, so copies of a closed site stay closed, with prod's
+  login.
 - **The labels** in `compose.yaml` tell devopsy what to do with each
-  service during a copy, on both sides (unlabeled services are left out):
-  `devopsy.clone=pause` on `app`, frozen while its mounts are copied
-  (Traefik keeps its router: visitors wait, then get their page), and
-  `devopsy.clone=custom` on `database`, the push script's. A paused
-  database flushes nothing, so it is never `pause`.
+  service during a copy, read on each side from its own release
+  (unlabeled services are left out, and the two sides must agree, hence
+  the inherited `CLONE_DATABASE`): `devopsy.clone=pause` on `app`, frozen
+  while its mounts are copied (Traefik keeps its router: visitors wait,
+  then get their page), and `devopsy.clone=${CLONE_DATABASE:-stop}` on
+  `database`. A paused database flushes nothing, so it is never `pause`.
 - **The maintenance page.** The `maintenance` service (nginx as 10001,
   read-only) answers every request with `.devopsy/docker/maintenance/index.html`,
   status 503 and `Retry-After: 30`. Its router has the app's rule at

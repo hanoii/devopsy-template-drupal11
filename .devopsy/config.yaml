@@ -17,15 +17,17 @@ defaults:
 environments:
   # inherit: variables every child gets from prod's server files, on its
   # first release and every clone (devopsy-cli's README, "Parent
-  # environments and clones"): SITE_BASIC_AUTH, so copies of a closed site
-  # stay closed, with prod's login. Unset on prod, nothing is written. For
-  # a raw copy of the database (compose.yaml, devopsy.clone=stop on it),
-  # add DB_PASSWORD: the copied datadir has prod's password.
+  # environments and clones"): CLONE_DATABASE, so both sides copy the
+  # database the same way (compose.yaml); DB_PASSWORD, since the copied
+  # datadir carries prod's password; SITE_BASIC_AUTH, so copies of a
+  # closed site stay closed, with prod's login. Unset on prod, nothing is
+  # written.
   prod:
-    inherit: [SITE_BASIC_AUTH]
+    inherit: [CLONE_DATABASE, DB_PASSWORD, SITE_BASIC_AUTH]
   # Children: cloned from prod on their first release, before deploy, and
-  # again with `devopsy @dev --clone`. Files are copied, the database is
-  # dumped (capabilities/clone/push); each keeps its own shared/.env.
+  # again with `devopsy @dev --clone`: files and the database rsynced by
+  # devopsy, or the database dumped (CLONE_DATABASE=custom,
+  # capabilities/clone/push); each keeps its own shared/.env otherwise.
   dev: {parent: prod}
   "pr-*":                         # pull request environments: @pr-123
     parent: prod

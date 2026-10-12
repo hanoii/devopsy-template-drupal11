@@ -102,15 +102,14 @@ services:
       start_period: 60s
       start_interval: 1s
     labels:
-      # Clones: custom leaves this service to capabilities/clone/push, which
-      # dumps it from the parent into the child's running database (prod
-      # keeps running, the child keeps its own DB_PASSWORD). The raw
-      # alternative is stop: the datadir rsynced by devopsy with the
-      # database stopped on both sides, prod down for the copy, and then
-      # DB_PASSWORD must be inherited (config.yaml): the datadir carries
-      # prod's users and passwords. Never pause: a paused database flushes
-      # nothing.
-      - devopsy.clone=custom
+      # Clones: CLONE_DATABASE (set on prod, inherited by children so both
+      # sides agree). stop, the default: devopsy rsyncs the datadir with
+      # the database stopped on both sides, prod down for the copy; the
+      # datadir carries prod's users and passwords, hence DB_PASSWORD in
+      # prod's inherit:. custom: capabilities/clone/push dumps it from the
+      # running parent into the child's database instead; prod stays up.
+      # Never pause: a paused database flushes nothing.
+      - devopsy.clone=${CLONE_DATABASE:-stop}
 
   # A page for when the app is stopped, unhealthy or failing: answered with
   # 503 and Retry-After (docker/maintenance). Its router has the app's rule
