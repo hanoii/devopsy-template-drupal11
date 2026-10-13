@@ -5,7 +5,8 @@
 # not come back in time, or in maintenance mode (`devopsy maintenance on`
 # creates /flag/on, mnt/maintenance/on on the host), index.html with status
 # 503 and Retry-After, whatever the method. Runs as 10001 on a read-only
-# root filesystem: /data, /config and /tmp are tmpfs, nothing is persisted.
+# root filesystem: its directories are under /tmp, a tmpfs, nothing is
+# persisted.
 {
 	admin off
 	auto_https off
