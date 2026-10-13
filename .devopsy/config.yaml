@@ -30,8 +30,9 @@ environments:
       - SITE_BASIC_AUTH
   # Children: cloned from prod on their first release, before deploy, and
   # again with `devopsy @dev --clone`: files and the database rsynced by
-  # devopsy, or the database dumped (CLONE_DATABASE=custom,
-  # capabilities/clone/push); each keeps its own shared/.env otherwise.
+  # devopsy with both stopped, or the database dumped (CLONE_DATABASE=custom,
+  # capabilities/clone/push) with the site running; each keeps its own
+  # shared/.env otherwise.
   dev: {parent: prod}
   "pr-*":                         # pull request environments: @pr-123
     parent: prod

@@ -66,21 +66,23 @@ services:
       # The FrankenPHP image exposes several ports: tell Traefik which one.
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}.loadbalancer.server.port=8080
       # While the app answers 502 or 503 (starting, failing), Traefik shows
-      # the maintenance service's page instead. The service must exist:
-      # Traefik drops a router whose middleware points at a missing one.
-      # The page is asked for as /hold.html, which nginx serves without
-      # Retry-After: the proxy's hold plugin then keeps retrying the app
-      # before letting the page out (a Retry-After would mean "down on
-      # purpose, answer at once", which is what / says for a stopped app).
+      # the maintenance service's page instead, once its hold plugin gave
+      # up retrying the app. The service must exist: Traefik drops a
+      # router whose middleware points at a missing one.
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.status=502-503
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.service=${COMPOSE_PROJECT_NAME:-app}-maintenance
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.query=/hold.html
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.query=/
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=${COMPOSE_PROJECT_NAME:-app}-maintenance
       # Clones (devopsy @<child> --clone, and a child's first release):
-      # paused on both sides while the data is copied. The server's Traefik
-      # keeps the router and holds requests until it is unpaused (its hold
-      # plugin retries the 503 of a paused container).
-      - devopsy.clone=pause
+      # CLONE_APP, from capabilities/env/compute: stopped on both sides
+      # with the database for a raw copy (in-flight requests finish, see
+      # stop_grace_period; the maintenance router answers meanwhile and
+      # the server's Traefik holds requests until the app is back), live
+      # for a dump.
+      - devopsy.clone=${CLONE_APP:-stop}
+    # Stopping waits for Caddy to finish the requests in flight (a clone,
+    # a deploy): Compose's default is 10s.
+    stop_grace_period: 30s
     networks: [default, traefik]
 
   database:
@@ -123,15 +125,17 @@ services:
       - devopsy.clone=${CLONE_DATABASE:-stop}
 
   # A page for when the app is stopped, unhealthy or failing: answered with
-  # 503 and Retry-After (docker/maintenance, for any request method). Its
-  # router has the app's rule at priority 2: Traefik prefers the app's
-  # router, whose priority is the rule's length, while the app runs and is
-  # healthy, and only drops it when the app is stopped. A paused or
-  # unhealthy app keeps its router and answers 503, which Traefik's hold
-  # plugin retries before showing this page (through the errors middleware
-  # above). No devopsy.clone label: clones never stop it. The image is the
-  # one devopsy-template-traefik's own page uses: nginx built to run as a
-  # plain user, the slim variant.
+  # 503 for any request method (docker/maintenance). Its router has the
+  # app's rule at priority 2: Traefik prefers the app's router, whose
+  # priority is the rule's length, while the app runs and is healthy, and
+  # only drops it when the app is stopped. Traefik's hold plugin retries
+  # before showing the page: a stopped app until its router is back, an
+  # unhealthy one until it answers (through the errors middleware above).
+  # In maintenance mode (`devopsy maintenance on`: mnt/maintenance/on
+  # exists) the page carries Retry-After and shows at once. No
+  # devopsy.clone label: clones never stop it, and never copy the flag.
+  # The image is the one devopsy-template-traefik's own page uses: nginx
+  # built to run as a plain user, the slim variant.
   maintenance:
     image: nginxinc/nginx-unprivileged:1.30.5-alpine-slim
     restart: unless-stopped
@@ -144,6 +148,9 @@ services:
     entrypoint: [nginx, -c, /maintenance/nginx.conf, -g, "daemon off;"]
     volumes:
       - ./docker/maintenance:/maintenance:ro
+      # The maintenance mode flag (deploy creates the directory, as the
+      # deploy user, so `devopsy maintenance` can write it).
+      - ./mnt/maintenance:/flag:ro
     cap_drop:
       - ALL
     security_opt:

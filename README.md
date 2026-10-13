@@ -41,6 +41,7 @@ devopsy @prod accesslog        # requests as they come (accesslog --help for fil
 devopsy @prod goaccess         # the access log in GoAccess's terminal view (q quits)
 devopsy @prod goaccess > report.html   # or as an HTML report
 devopsy @prod --releases
+devopsy @prod maintenance on   # take the site down on purpose, its page shown at once; off brings it back
 devopsy @prod --destroy        # remove it all: containers, database, files (runs destroy)
 ```
 
@@ -159,11 +160,13 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   ever served. Later releases keep the child's data; `--clone` copies prod
   again and runs `deploy` afterwards.
 - **What is copied:** `storage` (public and private files) and `logs`,
-  the `app` service's mounts, rsynced by devopsy from prod's server with
-  the app paused on both sides, and the database's datadir, rsynced with
-  the database stopped on both sides: a clean, consistent copy, and prod's
-  database is down for as long as it takes (the first time everything,
-  later only what changed). The datadir carries prod's users and password
+  the `app` service's mounts, and the database's datadir, rsynced by
+  devopsy from prod's server with the app and the database stopped on
+  both sides (the app first: its requests in flight finish, then the
+  database): files and database from the same moment, and prod is down
+  for as long as the copy takes (the first time everything, later only
+  what changed), its visitors held by the server's Traefik meanwhile (see
+  the maintenance page). The datadir carries prod's users and password
   hashes, and the image's root password is random, so children use prod's
   `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the child's own.
   A raw copy needs the same MariaDB on both sides (older cannot read
@@ -189,26 +192,30 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   service during a copy, read on each side from its own release
   (unlabeled services are left out, and the two sides must agree, hence
   the inherited `CLONE_DATABASE`; devopsy refuses to copy a datadir under
-  a child's running database): `devopsy.clone=pause` on `app`, frozen
-  while its mounts are copied (Traefik keeps its router: visitors wait,
-  then get their page), and `devopsy.clone=${CLONE_DATABASE:-stop}` on
-  `database`. A paused database flushes nothing, so it is never `pause`.
+  a child's running database): `devopsy.clone=${CLONE_DATABASE:-stop}`
+  on `database`, and `${CLONE_APP:-stop}` on `app`, which the `env`
+  capability derives from the database's choice: `stop` with a raw copy,
+  `live` with a dump (its files are rsynced as they are, under the
+  running site). Set `CLONE_APP` yourself for another (`pause` freezes
+  the app instead, visitors wait in its socket, but requests in flight
+  when the database stops fail). A paused database flushes nothing, so
+  it is never `pause`.
 - **The maintenance page.** The `maintenance` service (nginx as 10001,
   read-only) answers every request, whatever its method, with
-  `.devopsy/docker/maintenance/index.html`, status 503 and `Retry-After:
-  30`. Its router has the app's rule at priority 2, below the app's, so it
-  answers at once while the app is stopped (Traefik drops the app's router
-  then). The app's router sends its 502 and 503 answers there too (an
-  `errors` middleware asking for `/hold.html`, the same page without
-  `Retry-After`): the server's Traefik then keeps retrying the app for a
-  while (its `hold` plugin) before showing it, so a restart or a failing
-  start is a wait, not an error page. That includes Drupal's own
-  maintenance mode for anonymous visitors. During a clone the app is
-  paused: it keeps its router, and Traefik holds requests until it is
-  back, so the page appears only when the wait outlasts the server's hold
-  limit. Edit the page to brand it. To wait through short stops as well,
-  drop `Retry-After` from `nginx.conf`: Traefik then retries this router
-  too until the app's is back or its limit passes.
+  `.devopsy/docker/maintenance/index.html` and status 503. Its router has
+  the app's rule at priority 2, below the app's, so it answers while the
+  app is stopped (Traefik drops the app's router then), and the app's
+  router sends its 502 and 503 answers there too (an `errors`
+  middleware). Either way the server's Traefik holds the request first
+  (its `hold` plugin): it retries until the app's router is back, or the
+  app answers, or its limit passes, and only then shows the page. So a
+  clone, a deploy's restart or a failing start is a wait, not an error
+  page, and the page appears only when the wait outlasts the server's
+  hold limit. That includes Drupal's own maintenance mode for anonymous
+  visitors. `devopsy @prod maintenance on` is the exception: it stops
+  the app and flags the page (`mnt/maintenance/on`), which then carries
+  `Retry-After` and shows at once, no waiting, until `maintenance off`
+  or the next deploy. Edit the page to brand it.
 
 ## Locally
 

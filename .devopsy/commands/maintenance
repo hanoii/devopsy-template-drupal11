@@ -1,0 +1,31 @@
+#!/bin/sh
+## Description: Take the site down on purpose, with its page shown at once (on), or bring it back (off)
+# Maintenance mode: `on` stops the app and makes the maintenance page say
+# so (Retry-After), so the server's Traefik shows it at once instead of
+# holding requests for the app to come back; `off` starts the app and
+# removes the flag. Without the flag a stopped app (a clone, a deploy) is
+# a wait. The flag is mnt/maintenance/on, read by the maintenance service
+# (docker/maintenance/nginx.conf); a deploy removes it.
+set -eu
+
+flag=$DEVOPSY_PROJECT_DIR/mnt/maintenance/on
+case ${1:-} in
+  on)
+    mkdir -p "${flag%/*}"
+    : >"$flag"
+    devopsy stop app
+    echo "maintenance: on, the page is shown; devopsy maintenance off brings the site back" >&2
+    ;;
+  off)
+    devopsy up -d --wait app
+    rm -f "$flag"
+    echo "maintenance: off" >&2
+    ;;
+  status)
+    if [ -f "$flag" ]; then echo on; else echo off; fi
+    ;;
+  *)
+    echo "usage: devopsy maintenance on|off|status" >&2
+    exit 2
+    ;;
+esac

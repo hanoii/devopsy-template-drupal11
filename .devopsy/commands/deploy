@@ -12,8 +12,14 @@ set -eu
 # Secrets first, as the release's prepare step already did: for local use.
 devopsy secrets
 
+# The maintenance mode flag's directory, the deploy user's (Docker would
+# create a missing bind-mount directory as root).
+mkdir -p "$DEVOPSY_PROJECT_DIR/mnt/maintenance"
+
 devopsy build --pull
 devopsy up -d --wait --remove-orphans
+# A deploy ends maintenance mode: the site is up again.
+rm -f "$DEVOPSY_PROJECT_DIR/mnt/maintenance/on"
 
 if ! devopsy exec -T app drush status --field=bootstrap 2>/dev/null | grep -q Successful; then
   echo "deploy: Drupal is not installed: browse to the site or run drush site:install" >&2
