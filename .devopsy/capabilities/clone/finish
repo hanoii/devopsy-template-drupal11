@@ -1,0 +1,27 @@
+#!/bin/sh
+# The clone capability's finish (devopsy-cli's README, "Capabilities"):
+# devopsy runs it on the child after the copy (go) or a failed one
+# (abort), once the child's services are back, before deploy. After go
+# the child holds prod's data: what a copy should not keep goes here.
+set -eu
+[ "${1:-}" = go ] || exit 0
+
+# Emails and passwords, scrubbed by Drupal's own tool (user 1 included):
+# nobody logs into a child with a production password, and no mail from
+# a child reaches a real address. drush uli opens a session without one.
+devopsy exec -T app drush sql:sanitize --yes </dev/null
+
+# Closed by default: a child that inherits no SITE_BASIC_AUTH from prod,
+# and has none of its own, gets one here, once, printed this one time.
+# Set but empty means open on purpose (devopsy @<child> --vars set
+# SITE_BASIC_AUTH with an empty value, then reload): left alone then.
+# deploy's up starts Caddy with it: no restart here.
+if [ -z "${SITE_BASIC_AUTH+set}" ]; then
+  env_file="$DEVOPSY_PROJECT_DIR/.env"
+  password=$(head -c 24 /dev/urandom | base64 | tr -d '\n' | tr '+/' '-_')
+  if [ -s "$env_file" ] && [ "$(tail -c 1 "$env_file")" != "" ]; then
+    echo >>"$env_file"
+  fi
+  echo "SITE_BASIC_AUTH=preview:$password" >>"$env_file"
+  echo "finish: the site is closed with basic auth, user preview, password $password (set SITE_BASIC_AUTH empty to open it)" >&2
+fi

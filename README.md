@@ -93,8 +93,8 @@ configuration, only database updates until then.
   (on servers `devopsy @prod --vars set SITE_BASIC_AUTH`, then `devopsy
   @prod reload` or a release) and Caddy asks for it on every request. The
   entrypoint hashes the password and drops the plaintext before PHP starts;
-  the healthcheck, from inside the container, skips it. Unset, the site is
-  open.
+  the healthcheck, from inside the container, skips it. Unset or empty,
+  the site is open (children are closed by default: "Child environments").
 - **Access log.** Caddy logs each request as a JSON line, to the
   container's output (`devopsy @prod logs -f app`) and to
   `/app/logs/access.log`, a mount of its own (`.devopsy/mnt/logs`, on
@@ -183,6 +183,17 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   the whole dump arrived. Slower for big databases, no downtime on prod.
   The script is also the example of a `custom` service for your own
   services.
+- **Sanitized and closed.** After the copy, before `deploy`, the clone
+  capability's `finish` runs on the child (`.devopsy/capabilities/clone/finish`):
+  `drush sql:sanitize` scrubs every user's email and password, so no
+  production password opens a child and no mail from it reaches anyone
+  (`devopsy @dev drush uli` logs you in), and a child with no
+  `SITE_BASIC_AUTH`, inherited or its own, gets one generated into its
+  `shared/.env`, user `preview`, the password printed that once. To open
+  a child on purpose, set the variable empty and reload:
+  `SITE_BASIC_AUTH= devopsy @dev --vars set SITE_BASIC_AUTH`, then
+  `devopsy @dev reload`; set but empty stays open through later clones,
+  unset would be closed again.
 - **Inherited settings.** prod's `inherit:` names variables every child
   gets from prod's server into its own `shared/inherit.env`, on its first
   release, every clone and `devopsy @dev --inherit`: `CLONE_DATABASE`
