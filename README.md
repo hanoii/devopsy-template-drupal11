@@ -159,8 +159,9 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   updates, config import, caches) runs on prod's data and no empty site is
   ever served. Later releases keep the child's data; `--clone` copies prod
   again and runs `deploy` afterwards.
-- **What is copied:** `storage` (public and private files) and `logs`,
-  the `app` service's mounts, and the database's datadir, rsynced by
+- **What is copied:** `storage` (public and private files), the `app`
+  service's mount (not `logs`, its access log: `devopsy.clone.exclude`
+  keeps each environment's own), and the database's datadir, rsynced by
   devopsy from prod's server with the app and the database stopped on
   both sides (the app first: its requests in flight finish, then the
   database): files and database from the same moment, and prod is down

@@ -80,6 +80,8 @@ services:
       # the server's Traefik holds requests until the app is back), live
       # for a dump.
       - devopsy.clone=${CLONE_APP:-stop}
+      # The access log stays the environment's own: never copied.
+      - devopsy.clone.exclude=logs
     # Stopping waits for Caddy to finish the requests in flight (a clone,
     # a deploy): Compose's default is 10s.
     stop_grace_period: 30s
