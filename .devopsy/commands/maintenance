@@ -3,7 +3,7 @@
 # Maintenance mode: `on` stops the app and flags the page, so alwaysup
 # shows it at once instead of waiting for the app to come back; `off`
 # starts the app and removes the flag. Without the flag a stopped app (a
-# clone, a deploy) is a wait. The flag is mnt/maintenance/on, read by
+# sync, a deploy) is a wait. The flag is mnt/maintenance/on, read by
 # alwaysup (docker/alwaysup/Caddyfile); a deploy removes it.
 set -eu
 

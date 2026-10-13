@@ -1,5 +1,5 @@
 # alwaysup (compose.yaml): answers for the app while its router is gone,
-# stopped for a clone or a deploy, recreating, unhealthy. Caddy tries the
+# stopped for a sync or a deploy, recreating, unhealthy. Caddy tries the
 # app every second for up to ALWAYSUP_WAIT and streams its answer, so a
 # visitor who arrived meanwhile gets the real page, late. When the app does
 # not come back in time, or in maintenance mode (`devopsy maintenance on`

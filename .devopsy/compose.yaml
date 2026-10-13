@@ -69,14 +69,14 @@ services:
       # has no router for it and the alwaysup service's (below, priority
       # 2) answers instead: it waits for the app and streams its answer,
       # or shows the maintenance page.
-      # Clones (devopsy @<child> --clone, and a child's first release):
-      # CLONE_APP, from capabilities/env/compute: stopped on both sides
+      # Syncs (devopsy @<child> --sync, and a child's first release):
+      # SYNC_APP, from capabilities/env/compute: stopped on both sides
       # with the database for a raw copy (in-flight requests finish, see
       # stop_grace_period; alwaysup answers meanwhile), live for a dump.
-      - devopsy.clone=${CLONE_APP:-stop}
+      - devopsy.sync=${SYNC_APP:-stop}
       # The access log stays the environment's own: never copied.
-      - devopsy.clone.exclude=logs
-    # Stopping waits for Caddy to finish the requests in flight (a clone,
+      - devopsy.sync.exclude=logs
+    # Stopping waits for Caddy to finish the requests in flight (a sync,
     # a deploy): Compose's default is 10s.
     stop_grace_period: 30s
     networks: [default, traefik]
@@ -84,7 +84,7 @@ services:
   database:
     # Pinned exactly: a server keeps the image it pulled first, and a
     # floating tag would run a different version per server, while a
-    # clone copies the datadir raw from one to another (a downgrade is
+    # sync copies the datadir raw from one to another (a downgrade is
     # unsupported). Bump it here; each server upgrades on its next
     # release, MARIADB_AUTO_UPGRADE updating the system tables on start.
     image: mariadb:11.8.9
@@ -101,7 +101,7 @@ services:
     # A clean shutdown flushes InnoDB and checkpoints, longer than Docker's
     # 10s on a busy or big database; killed meanwhile, the datadir is a
     # crash image, recovered on the next start and copied as such by a
-    # clone. Waited for by stop, down and releases alike.
+    # sync. Waited for by stop, down and releases alike.
     stop_grace_period: 2m
     volumes:
       - ./mnt/database:/var/lib/mysql
@@ -111,18 +111,18 @@ services:
       start_period: 60s
       start_interval: 1s
     labels:
-      # Clones: CLONE_DATABASE (set on prod, inherited by children so both
+      # Syncs: SYNC_DATABASE (set on prod, inherited by children so both
       # sides agree). stop, the default: devopsy rsyncs the datadir with
       # the database stopped on both sides, prod down for the copy; the
       # datadir carries prod's users and passwords, hence DB_PASSWORD in
-      # prod's inherit:. custom: capabilities/clone/push dumps it from the
+      # prod's inherit:. custom: capabilities/sync/push dumps it from the
       # running parent into the child's database instead (created with
       # the same, inherited, password); prod stays up.
       # Never pause: a paused database flushes nothing.
-      - devopsy.clone=${CLONE_DATABASE:-stop}
+      - devopsy.sync=${SYNC_DATABASE:-stop}
 
   # alwaysup answers for the app while its router is gone: stopped for a
-  # clone or a deploy, recreating, unhealthy. Caddy tries the app every
+  # sync or a deploy, recreating, unhealthy. Caddy tries the app every
   # second for up to ALWAYSUP_WAIT (docker/alwaysup/Caddyfile) and streams
   # its answer, so visitors who arrive meanwhile get the real page, late;
   # when it does not come back in time, docker/alwaysup/index.html with
@@ -130,8 +130,8 @@ services:
   # on`: mnt/maintenance/on exists) the page shows at once. Its router has
   # the app's rule at priority 2, below the app's, so Traefik only sends
   # requests here while the app's router is gone: no middleman otherwise,
-  # and nothing needed from the server's Traefik. No devopsy.clone label:
-  # clones never stop it, and never copy the flag. As 10001, read-only;
+  # and nothing needed from the server's Traefik. No devopsy.sync label:
+  # syncs never stop it, and never copy the flag. As 10001, read-only;
   # Caddy's directories are tmpfs, nothing is persisted.
   alwaysup:
     image: caddy:2.11.7-alpine

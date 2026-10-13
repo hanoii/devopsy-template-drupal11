@@ -8,7 +8,7 @@ as a starting point for a Drupal site.
 ## Using this template
 
 A starting point to own, not a dependency: start a project from it on
-GitHub ("Use this template"), or clone it and keep this repository as a
+GitHub ("Use this template"), or sync it and keep this repository as a
 remote (`upstream`) to pull its changes when you choose. Nothing updates
 your copy, or what runs on your servers, but your own release.
 
@@ -148,19 +148,19 @@ there, which builds it again (from cache). Database updates are not undone.
 its site, each with its own containers, URL and `shared/.env`.
 
 ```sh
-devopsy @dev --release           # the first release clones prod, then runs deploy
+devopsy @dev --release           # the first release syncs prod, then runs deploy
 devopsy @pr-12 --release         # one per pull request, the same way
-devopsy @dev --clone             # copy prod again (asks for the name; --yes skips)
-devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for the files
+devopsy @dev --sync             # copy prod again (asks for the name; --yes skips)
+devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the files
 ```
 
-- **The first release clones.** After the new release goes live and before
+- **The first release syncs.** After the new release goes live and before
   `deploy`, devopsy copies prod's data into it, so `deploy` (database
   updates, config import, caches) runs on prod's data and no empty site is
-  ever served. Later releases keep the child's data; `--clone` copies prod
+  ever served. Later releases keep the child's data; `--sync` copies prod
   again and runs `deploy` afterwards.
 - **What is copied:** `storage` (public and private files), the `app`
-  service's mount (not `logs`, its access log: `devopsy.clone.exclude`
+  service's mount (not `logs`, its access log: `devopsy.sync.exclude`
   keeps each environment's own), and the database's datadir, rsynced by
   devopsy from prod's server with the app and the database stopped on
   both sides (the app first: its requests in flight finish, then the
@@ -173,9 +173,9 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   A raw copy needs the same MariaDB on both sides (older cannot read
   newer), so `compose.yaml` pins the exact version: bump it there, and
   each environment upgrades at its next release.
-- **A dump instead:** `CLONE_DATABASE=custom` on prod (`devopsy @prod
-  --vars set --show CLONE_DATABASE custom`; children inherit it, so both
-  sides agree) hands the database to `.devopsy/capabilities/clone/push`,
+- **A dump instead:** `SYNC_DATABASE=custom` on prod (`devopsy @prod
+  --vars set --show SYNC_DATABASE custom`; children inherit it, so both
+  sides agree) hands the database to `.devopsy/capabilities/sync/push`,
   which devopsy runs on prod after copying the files: prod keeps running,
   `mariadb-dump --single-transaction` reads it in one transaction, and the
   child imports it into its own database (started first: on a first
@@ -183,8 +183,8 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   the whole dump arrived. Slower for big databases, no downtime on prod.
   The script is also the example of a `custom` service for your own
   services.
-- **Sanitized and closed.** After the copy, before `deploy`, the clone
-  capability's `finish` runs on the child (`.devopsy/capabilities/clone/finish`):
+- **Sanitized and closed.** After the copy, before `deploy`, the sync
+  capability's `finish` runs on the child (`.devopsy/capabilities/sync/finish`):
   `drush sql:sanitize` scrubs every user's email and password, so no
   production password opens a child and no mail from it reaches anyone
   (`devopsy @dev drush uli` logs you in), and a child with no
@@ -192,11 +192,11 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   `shared/.env`, user `preview`, the password printed that once. To open
   a child on purpose, set the variable empty and reload:
   `SITE_BASIC_AUTH= devopsy @dev --vars set SITE_BASIC_AUTH`, then
-  `devopsy @dev reload`; set but empty stays open through later clones,
+  `devopsy @dev reload`; set but empty stays open through later syncs,
   unset would be closed again.
 - **Inherited settings.** prod's `inherit:` names variables every child
   gets from prod's server into its own `shared/inherit.env`, on its first
-  release, every clone and `devopsy @dev --inherit`: `CLONE_DATABASE`
+  release, every sync and `devopsy @dev --inherit`: `SYNC_DATABASE`
   (above), `DB_PASSWORD` (a raw datadir carries prod's password, a dump
   is imported into a database created with it: the same either way, so
   prod can switch between them under existing children), and
@@ -207,12 +207,12 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
 - **The labels** in `compose.yaml` tell devopsy what to do with each
   service during a copy, read on each side from its own release
   (unlabeled services are left out, and the two sides must agree, hence
-  the inherited `CLONE_DATABASE`; devopsy refuses to copy a datadir under
-  a child's running database): `devopsy.clone=${CLONE_DATABASE:-stop}`
-  on `database`, and `${CLONE_APP:-stop}` on `app`, which the `env`
+  the inherited `SYNC_DATABASE`; devopsy refuses to copy a datadir under
+  a child's running database): `devopsy.sync=${SYNC_DATABASE:-stop}`
+  on `database`, and `${SYNC_APP:-stop}` on `app`, which the `env`
   capability derives from the database's choice: `stop` with a raw copy,
   `live` with a dump (its files are rsynced as they are, under the
-  running site). Set `CLONE_APP` yourself for another (`pause` freezes
+  running site). Set `SYNC_APP` yourself for another (`pause` freezes
   the app instead, visitors wait in its socket, but requests in flight
   when the database stops fail). A paused database flushes nothing, so
   it is never `pause`.
@@ -220,7 +220,7 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule on a router
   at priority 2, below the app's: Traefik sends visitors straight to the
   app while its container runs, and to `alwaysup` only while the app's
-  router is gone, stopped for a clone or a deploy, recreating, failing
+  router is gone, stopped for a sync or a deploy, recreating, failing
   its healthcheck. Then Caddy tries the app every second for up to
   `ALWAYSUP_WAIT` (60 s) and streams its answer, so a visitor who
   arrived meanwhile gets the real page, late. Only when the app does not
