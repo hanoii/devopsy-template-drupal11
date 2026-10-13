@@ -10,6 +10,12 @@ set -eu
 # nobody logs into a child with a production password, and no mail from
 # a child reaches a real address. drush uli opens a session without one.
 # devopsy has the labeled services up by now, on a first release too.
+# Nothing arrived (a parent without sync labels, or an empty one): no
+# site to sanitize, and deploy will say Drupal is not installed.
+if ! devopsy exec -T app drush status --field=bootstrap </dev/null 2>/dev/null | grep -q Successful; then
+  echo "finish: Drupal is not installed here, nothing to sanitize" >&2
+  exit 0
+fi
 devopsy exec -T app drush sql:sanitize --yes </dev/null
 
 # Closed by default: a child that inherits no SITE_BASIC_AUTH from prod,
