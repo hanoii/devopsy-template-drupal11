@@ -41,6 +41,7 @@ devopsy @prod accesslog        # requests as they come (accesslog --help for fil
 devopsy @prod goaccess         # the access log in GoAccess's terminal view (q quits)
 devopsy @prod goaccess > report.html   # or as an HTML report
 devopsy @prod --releases
+devopsy @prod --status         # the release, its containers, the URL, maintenance mode, Drupal's version
 devopsy @prod maintenance on   # take the site down on purpose, its page shown at once; off brings it back
 devopsy @prod --destroy        # remove it all: containers, database, files (runs destroy)
 ```
