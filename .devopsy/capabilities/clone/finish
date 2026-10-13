@@ -9,9 +9,7 @@ set -eu
 # Emails and passwords, scrubbed by Drupal's own tool (user 1 included):
 # nobody logs into a child with a production password, and no mail from
 # a child reaches a real address. drush uli opens a session without one.
-# On a first release nothing of the child runs yet: start what drush
-# needs (a no-op when devopsy restored them after the copy).
-devopsy up -d --wait database app </dev/null
+# devopsy has the labeled services up by now, on a first release too.
 devopsy exec -T app drush sql:sanitize --yes </dev/null
 
 # Closed by default: a child that inherits no SITE_BASIC_AUTH from prod,
