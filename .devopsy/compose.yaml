@@ -157,6 +157,11 @@ services:
       - ./mnt/maintenance:/flag:ro
     cap_drop:
       - ALL
+    # The image's caddy binary carries this file capability, and execve
+    # refuses a binary whose file capabilities the bounding set lacks:
+    # without it the container dies with "operation not permitted".
+    cap_add:
+      - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges
     labels:
