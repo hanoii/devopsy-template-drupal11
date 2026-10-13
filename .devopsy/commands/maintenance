@@ -1,11 +1,10 @@
 #!/bin/sh
 ## Description: Take the site down on purpose, with its page shown at once (on), or bring it back (off)
-# Maintenance mode: `on` stops the app and makes the maintenance page say
-# so (Retry-After), so the server's Traefik shows it at once instead of
-# holding requests for the app to come back; `off` starts the app and
-# removes the flag. Without the flag a stopped app (a clone, a deploy) is
-# a wait. The flag is mnt/maintenance/on, read by the maintenance service
-# (docker/maintenance/nginx.conf); a deploy removes it.
+# Maintenance mode: `on` stops the app and flags the page, so alwaysup
+# shows it at once instead of waiting for the app to come back; `off`
+# starts the app and removes the flag. Without the flag a stopped app (a
+# clone, a deploy) is a wait. The flag is mnt/maintenance/on, read by
+# alwaysup (docker/alwaysup/Caddyfile); a deploy removes it.
 set -eu
 
 flag=$DEVOPSY_PROJECT_DIR/mnt/maintenance/on

@@ -65,22 +65,14 @@ services:
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.tls.certresolver=${CERTRESOLVER:-letsencrypt1}
       # The FrankenPHP image exposes several ports: tell Traefik which one.
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}.loadbalancer.server.port=8080
-      # While the app answers 502 or 503 (starting, failing), the server's
-      # Traefik holds the request (hold@file, its hold plugin: retried
-      # until the app answers or the server's limit passes), then shows
-      # the maintenance service's page instead (an errors middleware).
-      # Both must exist: Traefik drops a router whose middleware is
-      # missing, so this needs a devopsy-template-traefik with the plugin.
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.status=502-503
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.service=${COMPOSE_PROJECT_NAME:-app}-maintenance
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-maintenance.errors.query=/
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=hold@file,${COMPOSE_PROJECT_NAME:-app}-maintenance
+      # While this container is stopped, recreating or unhealthy, Traefik
+      # has no router for it and the alwaysup service's (below, priority
+      # 2) answers instead: it waits for the app and streams its answer,
+      # or shows the maintenance page.
       # Clones (devopsy @<child> --clone, and a child's first release):
       # CLONE_APP, from capabilities/env/compute: stopped on both sides
       # with the database for a raw copy (in-flight requests finish, see
-      # stop_grace_period; the maintenance router answers meanwhile and
-      # the server's Traefik holds requests until the app is back), live
-      # for a dump.
+      # stop_grace_period; alwaysup answers meanwhile), live for a dump.
       - devopsy.clone=${CLONE_APP:-stop}
       # The access log stays the environment's own: never copied.
       - devopsy.clone.exclude=logs
@@ -129,30 +121,37 @@ services:
       # Never pause: a paused database flushes nothing.
       - devopsy.clone=${CLONE_DATABASE:-stop}
 
-  # A page for when the app is stopped, unhealthy or failing: answered with
-  # 503 for any request method (docker/maintenance). Its router has the
-  # app's rule at priority 2: Traefik prefers the app's router, whose
-  # priority is the rule's length, while the app runs and is healthy, and
-  # only drops it when the app is stopped. Traefik's hold plugin retries
-  # before showing the page: a stopped app until its router is back, an
-  # unhealthy one until it answers (through the errors middleware above).
-  # In maintenance mode (`devopsy maintenance on`: mnt/maintenance/on
-  # exists) the page carries Retry-After and shows at once. No
-  # devopsy.clone label: clones never stop it, and never copy the flag.
-  # The image is the one devopsy-template-traefik's own page uses: nginx
-  # built to run as a plain user, the slim variant.
-  maintenance:
-    image: nginxinc/nginx-unprivileged:1.30.5-alpine-slim
+  # alwaysup answers for the app while its router is gone: stopped for a
+  # clone or a deploy, recreating, unhealthy. Caddy tries the app every
+  # second for up to ALWAYSUP_WAIT (docker/alwaysup/Caddyfile) and streams
+  # its answer, so visitors who arrive meanwhile get the real page, late;
+  # when it does not come back in time, docker/alwaysup/index.html with
+  # status 503 and Retry-After. In maintenance mode (`devopsy maintenance
+  # on`: mnt/maintenance/on exists) the page shows at once. Its router has
+  # the app's rule at priority 2, below the app's, so Traefik only sends
+  # requests here while the app's router is gone: no middleman otherwise,
+  # and nothing needed from the server's Traefik. No devopsy.clone label:
+  # clones never stop it, and never copy the flag. As 10001, read-only;
+  # Caddy's directories are tmpfs, nothing is persisted.
+  alwaysup:
+    image: caddy:2.11.7-alpine
     restart: unless-stopped
     user: "10001:10001"
     read_only: true
     tmpfs:
       - /tmp
-    # nginx directly: the image's entrypoint scripts edit its default
-    # configuration, which this service does not use.
-    entrypoint: [nginx, -c, /maintenance/nginx.conf, -g, "daemon off;"]
+      - /data
+      - /config
+    command: [caddy, run, --config, /alwaysup/Caddyfile, --adapter, caddyfile]
+    environment:
+      ALWAYSUP_WAIT: ${ALWAYSUP_WAIT:-60s}
+    healthcheck:
+      test: ['CMD', 'wget', '-Y', 'off', '-q', '-O', '/dev/null', 'http://127.0.0.1:8081/']
+      interval: 10s
+      timeout: 5s
+      retries: 3
     volumes:
-      - ./docker/maintenance:/maintenance:ro
+      - ./docker/alwaysup:/alwaysup:ro
       # The maintenance mode flag (deploy creates the directory, as the
       # deploy user, so `devopsy maintenance` can write it).
       - ./mnt/maintenance:/flag:ro
@@ -162,16 +161,14 @@ services:
       - no-new-privileges
     labels:
       - traefik.enable=true
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.rule=${SITE_HOST_RULE:-HostRegexp(`^app\.localhost$`)}
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.tls.certresolver=${CERTRESOLVER:-letsencrypt1}
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.priority=2
-      # Held too: a stopped app is a wait, the page only after the
-      # server's hold limit, unless the page carries Retry-After
-      # (`devopsy maintenance on`), which passes at once.
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.middlewares=hold@file
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-maintenance.service=${COMPOSE_PROJECT_NAME:-app}-maintenance
-      - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-maintenance.loadbalancer.server.port=8080
-    networks: [traefik]
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.rule=${SITE_HOST_RULE:-HostRegexp(`^app\.localhost$`)}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.tls.certresolver=${CERTRESOLVER:-letsencrypt1}
+      # Below the app's router (a rule's length) and above the server's
+      # own maintenance page (1).
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.priority=2
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.service=${COMPOSE_PROJECT_NAME:-app}-alwaysup
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-alwaysup.loadbalancer.server.port=8080
+    networks: [default, traefik]
 
   # GoAccess for `devopsy goaccess`: it reads the access log files Caddy
   # writes in mnt/logs, as their owner, and prints a report. Never started
