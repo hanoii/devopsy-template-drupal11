@@ -223,8 +223,9 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   app is stopped (Traefik drops the app's router then), and the app's
   router sends its 502 and 503 answers there too (an `errors`
   middleware). Either way the server's Traefik holds the request first
-  (its `hold` plugin): it retries until the app's router is back, or the
-  app answers, or its limit passes, and only then shows the page. So a
+  (both routers name its `hold@file` middleware): it retries until the
+  app's router is back, or the app answers, or its limit passes, and
+  only then shows the page. So a
   clone, a deploy's restart or a failing start is a wait, not an error
   page, and the page appears only when the wait outlasts the server's
   hold limit. That includes Drupal's own maintenance mode for anonymous
