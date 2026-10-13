@@ -166,8 +166,8 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   both sides (the app first: its requests in flight finish, then the
   database): files and database from the same moment, and prod is down
   for as long as the copy takes (the first time everything, later only
-  what changed), its visitors held by the server's Traefik meanwhile (see
-  the maintenance page). The datadir carries prod's users and password
+  what changed), its visitors waiting on `alwaysup` meanwhile (below).
+  The datadir carries prod's users and password
   hashes, and the image's root password is random, so children use prod's
   `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the child's own.
   A raw copy needs the same MariaDB on both sides (older cannot read
@@ -216,23 +216,22 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   the app instead, visitors wait in its socket, but requests in flight
   when the database stops fail). A paused database flushes nothing, so
   it is never `pause`.
-- **The maintenance page.** The `maintenance` service (nginx as 10001,
-  read-only) answers every request, whatever its method, with
-  `.devopsy/docker/maintenance/index.html` and status 503. Its router has
-  the app's rule at priority 2, below the app's, so it answers while the
-  app is stopped (Traefik drops the app's router then), and the app's
-  router sends its 502 and 503 answers there too (an `errors`
-  middleware). Either way the server's Traefik holds the request first
-  (both routers name its `hold@file` middleware): it retries until the
-  app's router is back, or the app answers, or its limit passes, and
-  only then shows the page. So a
-  clone, a deploy's restart or a failing start is a wait, not an error
-  page, and the page appears only when the wait outlasts the server's
-  hold limit. That includes Drupal's own maintenance mode for anonymous
-  visitors. `devopsy @prod maintenance on` is the exception: it stops
-  the app and flags the page (`mnt/maintenance/on`), which then carries
-  `Retry-After` and shows at once, no waiting, until `maintenance off`
-  or the next deploy. Edit the page to brand it.
+- **Always there: `alwaysup`.** A small Caddy (as 10001, read-only,
+  `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule on a router
+  at priority 2, below the app's: Traefik sends visitors straight to the
+  app while its container runs, and to `alwaysup` only while the app's
+  router is gone, stopped for a clone or a deploy, recreating, failing
+  its healthcheck. Then Caddy tries the app every second for up to
+  `ALWAYSUP_WAIT` (60 s) and streams its answer, so a visitor who
+  arrived meanwhile gets the real page, late. Only when the app does not
+  come back in time does it answer `.devopsy/docker/alwaysup/index.html`
+  with status 503 and `Retry-After`, whatever the method. The app's own
+  answers, Drupal's maintenance mode included, pass through untouched.
+  `devopsy @prod maintenance on` is the deliberate outage: it stops the
+  app and flags the page (`mnt/maintenance/on`), which then shows at
+  once, no waiting, until `maintenance off` or the next deploy. Edit the
+  page to brand it. Nothing of this needs the server's Traefik: any
+  Traefik that routes the project routes it.
 
 ## Locally
 

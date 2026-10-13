@@ -1,0 +1,46 @@
+# alwaysup (compose.yaml): answers for the app while its router is gone,
+# stopped for a clone or a deploy, recreating, unhealthy. Caddy tries the
+# app every second for up to ALWAYSUP_WAIT and streams its answer, so a
+# visitor who arrived meanwhile gets the real page, late. When the app does
+# not come back in time, or in maintenance mode (`devopsy maintenance on`
+# creates /flag/on, mnt/maintenance/on on the host), index.html with status
+# 503 and Retry-After, whatever the method. Runs as 10001 on a read-only
+# root filesystem: /data, /config and /tmp are tmpfs, nothing is persisted.
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+(page) {
+	header Retry-After 30
+	header Cache-Control no-store
+	header Content-Type "text/html; charset=utf-8"
+	respond "{file./alwaysup/index.html}" 503
+}
+
+:8080 {
+	@maintenance file {
+		root /flag
+		try_files /on
+	}
+	handle @maintenance {
+		import page
+	}
+	handle {
+		# The app's own answers, errors included, pass through untouched;
+		# only an app that cannot be reached in time becomes the page.
+		reverse_proxy app:8080 {
+			lb_try_duration {$ALWAYSUP_WAIT:60s}
+			lb_try_interval 1s
+		}
+	}
+	handle_errors {
+		import page
+	}
+}
+
+# The healthcheck's, so it never reaches the app.
+:8081 {
+	respond 204
+}
