@@ -180,14 +180,18 @@ devopsy @dev --clone -- --exclude=css   # arguments after -- go to rsync, for th
   child imports it into its own database (started first: on a first
   release nothing of the child runs yet), replacing what it had, only once
   the whole dump arrived. Slower for big databases, no downtime on prod.
-  The child then keeps its own `DB_PASSWORD`. The script is also the
-  example of a `custom` service for your own services.
+  The script is also the example of a `custom` service for your own
+  services.
 - **Inherited settings.** prod's `inherit:` names variables every child
-  gets from prod's server, on its first release and every clone, prod's
-  value winning: `CLONE_DATABASE` (above), `DB_PASSWORD` only while the
-  database is labeled `stop` on prod (`DB_PASSWORD: {database: stop}`:
-  a raw datadir needs it, a dump does not), and `SITE_BASIC_AUTH`, so
-  copies of a closed site stay closed, with prod's login.
+  gets from prod's server into its own `shared/inherit.env`, on its first
+  release, every clone and `devopsy @dev --inherit`: `CLONE_DATABASE`
+  (above), `DB_PASSWORD` (a raw datadir carries prod's password, a dump
+  is imported into a database created with it: the same either way, so
+  prod can switch between them under existing children), and
+  `SITE_BASIC_AUTH`, so copies of a closed site stay closed, with prod's
+  login. A child's own `shared/.env` wins over the inherited file:
+  `devopsy @dev --vars set` a value to keep it from following prod,
+  `unset` it to follow again.
 - **The labels** in `compose.yaml` tell devopsy what to do with each
   service during a copy, read on each side from its own release
   (unlabeled services are left out, and the two sides must agree, hence

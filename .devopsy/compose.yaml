@@ -120,7 +120,8 @@ services:
       # the database stopped on both sides, prod down for the copy; the
       # datadir carries prod's users and passwords, hence DB_PASSWORD in
       # prod's inherit:. custom: capabilities/clone/push dumps it from the
-      # running parent into the child's database instead; prod stays up.
+      # running parent into the child's database instead (created with
+      # the same, inherited, password); prod stays up.
       # Never pause: a paused database flushes nothing.
       - devopsy.clone=${CLONE_DATABASE:-stop}
 
