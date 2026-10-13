@@ -1,5 +1,5 @@
 #!/bin/sh
-# The clone capability's finish (devopsy-cli's README, "Capabilities"):
+# The sync capability's finish (devopsy-cli's README, "Capabilities"):
 # devopsy runs it on the child after the copy (go) or a failed one
 # (abort), once the child's services are back, before deploy. After go
 # the child holds prod's data: what a copy should not keep goes here.

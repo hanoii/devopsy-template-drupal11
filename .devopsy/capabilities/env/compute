@@ -11,15 +11,15 @@
 # <name>.localhost; in a release without one (DEVOPSY_TARGET is set) there
 # is none, and a release without DEVOPSY_DOMAINS has no host at all.
 set -euf
-# Clones (compose.yaml's devopsy.clone labels): the app follows the
-# database's choice. Raw datadir (CLONE_DATABASE unset or stop): the app
+# Syncs (compose.yaml's devopsy.sync labels): the app follows the
+# database's choice. Raw datadir (SYNC_DATABASE unset or stop): the app
 # is stopped too, so the files and the database are copied from the same
 # moment and in-flight requests finish before the database stops. A dump
 # (custom): the app keeps running, rsync copies the files as they are.
-# Set CLONE_APP yourself to choose otherwise (live, pause, stop).
-case ${CLONE_DATABASE:-stop} in
-  custom) echo "CLONE_APP='live'" ;;
-  *) echo "CLONE_APP='stop'" ;;
+# Set SYNC_APP yourself to choose otherwise (live, pause, stop).
+case ${SYNC_DATABASE:-stop} in
+  custom) echo "SYNC_APP='live'" ;;
+  *) echo "SYNC_APP='stop'" ;;
 esac
 name=${COMPOSE_PROJECT_NAME:?}
 wildcard=

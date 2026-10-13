@@ -1,24 +1,24 @@
 #!/bin/sh
-# The clone capability's push (devopsy-cli's README, "Capabilities"): devopsy
+# The sync capability's push (devopsy-cli's README, "Capabilities"): devopsy
 # runs it on the parent (prod), in its current release with its environment,
-# when a child is cloned (its first release, or devopsy @<child> --clone).
-# The child is ready: its app paused (its own devopsy.clone labels,
+# when a child is syncd (its first release, or devopsy @<child> --sync).
+# The child is ready: its app paused (its own devopsy.sync labels,
 # compose.yaml). Its database may not exist yet: on a child's first
 # release nothing of it has run, so this starts it. Afterwards the child's
 # deploy runs on the copy: database updates, config import, caches.
 #
-# Only the database is this script's, and only with CLONE_DATABASE=custom
-# on prod (compose.yaml labels it devopsy.clone=custom then; the default,
+# Only the database is this script's, and only with SYNC_DATABASE=custom
+# on prod (compose.yaml labels it devopsy.sync=custom then; the default,
 # stop, lets devopsy rsync the datadir instead and never runs this).
 # devopsy has already rsynced storage and logs, the app's mounts, with the
-# app paused on both sides. Arguments given to --clone after -- are
+# app paused on both sides. Arguments given to --sync after -- are
 # rsync's, not used here.
 set -eu
 
 # The child's database, started when it is not running yet (a first
 # release); its DB_PASSWORD is already there, inherited from prod before
 # the release's prepare.
-devopsy --clone-exec up -d --wait database </dev/null
+devopsy --sync-exec up -d --wait database </dev/null
 
 # The dump: prod keeps running, consistent through one transaction. Each
 # side's credentials from its own database container's environment, read
@@ -34,7 +34,7 @@ devopsy --clone-exec up -d --wait database </dev/null
 devopsy exec -T database sh -c '
   exec mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" \
     --single-transaction --quick --routines --events "$MARIADB_DATABASE"
-' </dev/null | devopsy --clone-exec exec -T database sh -c '
+' </dev/null | devopsy --sync-exec exec -T database sh -c '
   set -eu
   dump=$(mktemp)
   trap "rm -f \"$dump\"" EXIT
@@ -42,12 +42,12 @@ devopsy exec -T database sh -c '
   case $(tail -n 1 "$dump") in
     "-- Dump completed"*) ;;
     *)
-      echo "clone: the dump from the parent is incomplete; the database is left as it was" >&2
+      echo "sync: the dump from the parent is incomplete; the database is left as it was" >&2
       exit 1
       ;;
   esac
   mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" \
     -e "DROP DATABASE IF EXISTS $MARIADB_DATABASE; CREATE DATABASE $MARIADB_DATABASE"
   mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" <"$dump"
-  echo "clone: database imported" >&2
+  echo "sync: database imported" >&2
 '
