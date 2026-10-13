@@ -5,6 +5,12 @@
 set -eu
 
 echo "url          ${SITE_URL:-no URL: no wildcard domain or DEVOPSY_DOMAINS}"
+# The login in front of the site, in full: this is where to look it up.
+if [ -n "${SITE_BASIC_AUTH:-}" ]; then
+  echo "basic auth   $SITE_BASIC_AUTH"
+else
+  echo "basic auth   none, the site is open"
+fi
 if [ -f "$DEVOPSY_PROJECT_DIR/mnt/maintenance/on" ]; then
   echo "maintenance  on (devopsy maintenance off brings the site back)"
 else
@@ -12,8 +18,9 @@ else
 fi
 # Drupal, when the app runs: its version and whether it is installed.
 if devopsy ps --services --status running 2>/dev/null | grep -qx app; then
-  if version=$(devopsy exec -T app drush status --field=drupal-version 2>/dev/null </dev/null) && [ -n "$version" ]; then
-    if devopsy exec -T app drush status --field=bootstrap 2>/dev/null </dev/null | grep -q Successful; then
+  version=$(devopsy exec -T app drush status --field=drupal-version </dev/null 2>/dev/null || true)
+  if [ -n "$version" ]; then
+    if devopsy exec -T app drush status --field=bootstrap </dev/null 2>/dev/null | grep -q Successful; then
       echo "drupal       $version, installed"
     else
       echo "drupal       $version, not installed (drush site:install)"
