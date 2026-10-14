@@ -10,6 +10,7 @@
 # Build mode, devopsy's default: a release uploads the whole project and the
 # image is built on the server.
 project: drupal11
+secrets: [DB_PASSWORD, DRUPAL_HASH_SALT, SITE_BASIC_AUTH]
 defaults:
   release: {prepare: secrets, run: deploy}
   rollback: {prepare: secrets, run: deploy}
