@@ -146,6 +146,11 @@ services:
     command: [caddy, run, --config, /alwaysup/Caddyfile, --adapter, caddyfile]
     environment:
       ALWAYSUP_WAIT: ${ALWAYSUP_WAIT:-60s}
+      # The app by a name Docker's DNS only answers on this project's
+      # network: a plain `app` is also an alias on the shared traefik
+      # network, where every project's app carries it, and with ours
+      # stopped it would resolve to another project's.
+      ALWAYSUP_UPSTREAM: app.${COMPOSE_PROJECT_NAME:-drupal11}_default:8080
       XDG_DATA_HOME: /tmp/data
       XDG_CONFIG_HOME: /tmp/config
     healthcheck:
@@ -218,6 +223,11 @@ services:
       - no-new-privileges
 
 networks:
+  # Named from the project, so alwaysup's app.<project>_default upstream
+  # holds under plain docker compose too (the default would be the
+  # directory's name).
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-drupal11}_default
   traefik:
     name: traefik
     external: true
