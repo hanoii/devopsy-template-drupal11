@@ -31,7 +31,10 @@
 	handle {
 		# The app's own answers, errors included, pass through untouched;
 		# only an app that cannot be reached in time becomes the page.
-		reverse_proxy app:8080 {
+		# The upstream is app.<project>_default, scoped to this project's
+		# network (compose.yaml): on the shared traefik network a plain
+		# `app` could resolve to another project's app while ours is down.
+		reverse_proxy {$ALWAYSUP_UPSTREAM} {
 			lb_try_duration {$ALWAYSUP_WAIT:60s}
 			lb_try_interval 1s
 		}
