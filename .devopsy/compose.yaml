@@ -176,8 +176,7 @@ services:
       - traefik.enable=true
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.rule=${SITE_HOST_RULE:-HostRegexp(`^app\.localhost$`)}
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.tls.certresolver=${CERTRESOLVER:-letsencrypt1}
-      # Below the app's router (a rule's length) and above the server's
-      # own maintenance page (1).
+      # Below the app's router (a rule's length).
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.priority=2
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.service=${COMPOSE_PROJECT_NAME:-app}-alwaysup
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-alwaysup.loadbalancer.server.port=8080
