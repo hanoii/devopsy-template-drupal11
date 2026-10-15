@@ -161,7 +161,7 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   ever served. Later releases keep the child's data; `--sync` copies prod
   again and runs `deploy` afterwards.
 - **What is copied:** `storage` (public and private files), the `app`
-  service's mount (not `logs`, its access log: `devopsy.sync.exclude`
+  service's mount (not `logs`, its access log: `devopsy.sync.rsync.exclude`
   keeps each environment's own), and the database's datadir, rsynced by
   devopsy from prod's server with the app and the database stopped on
   both sides (the app first: its requests in flight finish, then the
@@ -174,16 +174,30 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   A raw copy needs the same MariaDB on both sides (older cannot read
   newer), so `compose.yaml` pins the exact version: bump it there, and
   each environment upgrades at its next release.
-- **A dump instead:** `SYNC_DATABASE=custom` on prod (`devopsy @prod
-  --vars set --show SYNC_DATABASE custom`; children inherit it, so both
-  sides agree) hands the database to `.devopsy/capabilities/sync/push`,
-  which devopsy runs on prod after copying the files: prod keeps running,
-  `mariadb-dump --single-transaction` reads it in one transaction, and the
-  child imports it into its own database (started first: on a first
-  release nothing of the child runs yet), replacing what it had, only once
-  the whole dump arrived. Slower for big databases, no downtime on prod.
-  The script is also the example of a `custom` service for your own
-  services.
+- **A dump instead:** `SYNC_DATABASE=stream` on prod (`devopsy @prod
+  --vars set --show SYNC_DATABASE stream`; children inherit it, so both
+  sides agree) streams the database instead of copying its datadir:
+  devopsy runs `.devopsy/capabilities/sync/export database` on prod,
+  where `mariadb-dump --single-transaction` reads it in one transaction,
+  and, only once the whole dump arrived, `import database` on the child,
+  which replaces its database with it (devopsy has it up first). Nothing
+  is stopped: the `env` capability sets `SYNC_APP_STOP` and
+  `SYNC_DATABASE_STOP` to `false` then, and the site's files are rsynced
+  as they are, under the running site. Slower for big databases, no
+  downtime on prod. The scripts are also the example of a `stream`
+  service for your own services.
+- **Exports and imports.** `--export` and `--import` move one labeled
+  service's data the way its label says, outside a sync. With
+  `SYNC_DATABASE=stream` the database's are the same `export` and
+  `import` scripts, so `devopsy @prod --export database > dump.sql` is
+  the way to get a dump of prod (the site running), and `devopsy
+  --import database < dump.sql` loads it locally (with
+  `SYNC_DATABASE=stream` in `.devopsy/.env` too: each side reads its own
+  label), or into a child (`devopsy @dev --import database < dump.sql`,
+  which asks for the environment's name).
+  With the default `rsync`, `--export database` is instead a tar of the
+  datadir, the database stopped around it, and `devopsy @prod --export
+  app > files.tar` is always a tar of the site's files.
 - **Sanitized and closed.** After the copy, before `deploy`, the sync
   capability's `finish` runs on the child (`.devopsy/capabilities/sync/finish`):
   `drush sql:sanitize` scrubs every user's email and password, so no
@@ -209,14 +223,14 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   service during a copy, read on each side from its own release
   (unlabeled services are left out, and the two sides must agree, hence
   the inherited `SYNC_DATABASE`; devopsy refuses to copy a datadir under
-  a child's running database): `devopsy.sync=${SYNC_DATABASE:-stop}`
-  on `database`, and `${SYNC_APP:-stop}` on `app`, which the `env`
-  capability derives from the database's choice: `stop` with a raw copy,
-  `live` with a dump (its files are rsynced as they are, under the
-  running site). Set `SYNC_APP` yourself for another (`pause` freezes
-  the app instead, visitors wait in its socket, but requests in flight
-  when the database stops fail). A paused database flushes nothing, so
-  it is never `pause`.
+  a child's running database). `devopsy.sync` says how the data moves:
+  `rsync` on `app`, `${SYNC_DATABASE:-rsync}` on `database`.
+  `devopsy.sync.stop` says whether the service is stopped on both sides
+  for the whole copy: `${SYNC_APP_STOP:-true}` and
+  `${SYNC_DATABASE_STOP:-true}`, which the `env` capability turns to
+  `false` with `SYNC_DATABASE=stream`. Set either yourself to choose
+  otherwise, but never copy a running datadir: with `rsync` on the
+  database, keep it stopped.
 - **Always there: `alwaysup`.** A small Caddy (as 10001, read-only,
   `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule on a router
   at priority 2, below the app's: Traefik sends visitors straight to the

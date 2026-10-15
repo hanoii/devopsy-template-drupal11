@@ -12,15 +12,17 @@
 # is none, and a release without DEVOPSY_DOMAINS has no host at all.
 set -euf
 # Syncs (compose.yaml's devopsy.sync labels): the app follows the
-# database's choice. Raw datadir (SYNC_DATABASE unset or stop): the app
-# is stopped too, so the files and the database are copied from the same
-# moment and in-flight requests finish before the database stops. A dump
-# (custom): the app keeps running, rsync copies the files as they are.
-# Set SYNC_APP yourself to choose otherwise (live, pause, stop).
-case ${SYNC_DATABASE:-stop} in
-  custom) echo "SYNC_APP='live'" ;;
-  *) echo "SYNC_APP='stop'" ;;
-esac
+# database's choice. A raw datadir (SYNC_DATABASE unset or rsync): nothing
+# printed, the labels' defaults stop the app and the database on both
+# sides, so the files and the database are copied from the same moment and
+# in-flight requests finish before the database stops. A dump (stream):
+# both keep running, the database dumped through one transaction and the
+# files rsynced as they are. devopsy only sets what is unset: set
+# SYNC_APP_STOP or SYNC_DATABASE_STOP yourself to choose otherwise.
+if [ "${SYNC_DATABASE:-rsync}" = stream ]; then
+  echo "SYNC_APP_STOP='false'"
+  echo "SYNC_DATABASE_STOP='false'"
+fi
 name=${COMPOSE_PROJECT_NAME:?}
 wildcard=
 if [ -n "${DEVOPSY_WILDCARD_DOMAIN:-}" ]; then

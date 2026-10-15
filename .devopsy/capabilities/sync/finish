@@ -1,10 +1,11 @@
 #!/bin/sh
 # The sync capability's finish (devopsy-cli's README, "Capabilities"):
-# devopsy runs it on the child after the copy (go) or a failed one
-# (abort), once the child's services are back, before deploy. After go
-# the child holds prod's data: what a copy should not keep goes here.
+# devopsy runs it on each side once that side's services are back,
+# with parent|child and go (the copy succeeded) or abort. Only the
+# child after go does anything, before its deploy: it holds prod's data
+# now, and what a copy should not keep goes here.
 set -eu
-[ "${1:-}" = go ] || exit 0
+[ "${1:-}" = child ] && [ "${2:-}" = go ] || exit 0
 
 # Emails and passwords, scrubbed by Drupal's own tool (user 1 included):
 # nobody logs into a child with a production password, and no mail from

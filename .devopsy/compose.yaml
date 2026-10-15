@@ -70,12 +70,17 @@ services:
       # 2) answers instead: it waits for the app and streams its answer,
       # or shows the maintenance page.
       # Syncs (devopsy @<child> --sync, and a child's first release):
-      # SYNC_APP, from capabilities/env/compute: stopped on both sides
-      # with the database for a raw copy (in-flight requests finish, see
-      # stop_grace_period; alwaysup answers meanwhile), live for a dump.
-      - devopsy.sync=${SYNC_APP:-stop}
+      # devopsy rsyncs storage. By default the app is stopped on both
+      # sides for the whole copy, with the database, so files and
+      # database come from the same moment (in-flight requests finish
+      # first, see stop_grace_period; alwaysup answers meanwhile).
+      # SYNC_APP_STOP is false when the database is streamed
+      # (capabilities/env/compute): the site keeps running and its files
+      # are copied as they are.
+      - devopsy.sync=rsync
+      - devopsy.sync.stop=${SYNC_APP_STOP:-true}
       # The access log stays the environment's own: never copied.
-      - devopsy.sync.exclude=logs
+      - devopsy.sync.rsync.exclude=logs
     # Stopping waits for Caddy to finish the requests in flight (a sync,
     # a deploy): Compose's default is 10s.
     stop_grace_period: 30s
@@ -112,14 +117,20 @@ services:
       start_interval: 1s
     labels:
       # Syncs: SYNC_DATABASE (set on prod, inherited by children so both
-      # sides agree). stop, the default: devopsy rsyncs the datadir with
-      # the database stopped on both sides, prod down for the copy; the
-      # datadir carries prod's users and passwords, hence DB_PASSWORD in
-      # prod's inherit:. custom: capabilities/sync/push dumps it from the
-      # running parent into the child's database instead (created with
-      # the same, inherited, password); prod stays up.
-      # Never pause: a paused database flushes nothing.
-      - devopsy.sync=${SYNC_DATABASE:-stop}
+      # sides agree). rsync, the default: devopsy copies the datadir raw
+      # with the database stopped on both sides (SYNC_DATABASE_STOP),
+      # consistent, prod down for the copy. Never copy a running datadir:
+      # it is not a consistent image. The datadir carries prod's users
+      # and passwords, hence DB_PASSWORD in prod's inherit:. stream:
+      # capabilities/sync/export dumps the running parent's database and
+      # capabilities/sync/import loads it into the child's (created with
+      # the same, inherited, password); both stay up
+      # (capabilities/env/compute sets SYNC_DATABASE_STOP and
+      # SYNC_APP_STOP to false), prod included. The same scripts serve
+      # devopsy @prod --export database > dump.sql and devopsy --import
+      # database < dump.sql.
+      - devopsy.sync=${SYNC_DATABASE:-rsync}
+      - devopsy.sync.stop=${SYNC_DATABASE_STOP:-true}
 
   # alwaysup answers for the app while its router is gone: stopped for a
   # sync or a deploy, recreating, unhealthy. Caddy tries the app every

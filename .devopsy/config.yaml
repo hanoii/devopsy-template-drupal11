@@ -28,10 +28,10 @@ environments:
   prod:
     inherit: [SYNC_DATABASE, DB_PASSWORD, SITE_BASIC_AUTH]
   # Children: syncd from prod on their first release, before deploy, and
-  # again with `devopsy @dev --sync`: files and the database rsynced by
-  # devopsy with both stopped, or the database dumped (SYNC_DATABASE=custom,
-  # capabilities/sync/push) with the site running; each keeps its own
-  # shared/.env otherwise.
+  # again with `devopsy @dev --sync`: files and the database's datadir
+  # rsynced by devopsy with both stopped, or the database streamed
+  # (SYNC_DATABASE=stream: capabilities/sync/export and import) with the
+  # site running; each keeps its own shared/.env otherwise.
   dev: {parent: prod}
   "pr-*":                         # pull request environments: @pr-123
     parent: prod
