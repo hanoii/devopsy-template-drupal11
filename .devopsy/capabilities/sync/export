@@ -1,0 +1,36 @@
+#!/bin/sh
+# The sync capability's export (devopsy-cli's README, "Capabilities"):
+# writes one service's data to stdout. devopsy runs it on the parent, in
+# its current release with its environment, for each service labeled
+# devopsy.sync=stream when a child is synced (its first release, or
+# devopsy @<child> --sync), and for --export:
+#   devopsy @prod --export database > dump.sql
+# Only the database is this script's, streamed with SYNC_DATABASE=stream
+# (compose.yaml). The dump needs the database running: with
+# devopsy.sync.stop=true devopsy stops it first, and this refuses.
+set -eu
+service=${1:?usage: export <service>}
+
+case " ${DEVOPSY_SYNC_STOP:-} " in
+  *" $service "*)
+    echo "export: $service is stopped for the copy, and a dump needs the database running: set devopsy.sync.stop=false for a stream (SYNC_DATABASE_STOP=false)" >&2
+    exit 1
+    ;;
+esac
+
+case $service in
+  database)
+    # Consistent through one transaction, the site running. The
+    # credentials from the database container's environment, read inside
+    # it: no password on a command line here.
+    # shellcheck disable=SC2016
+    devopsy exec -T database sh -c '
+      exec mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" \
+        --single-transaction --quick --routines --events "$MARIADB_DATABASE"
+    ' </dev/null
+    ;;
+  *)
+    echo "export: no export for $service, only database" >&2
+    exit 1
+    ;;
+esac
