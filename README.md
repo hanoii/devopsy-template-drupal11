@@ -58,8 +58,9 @@ configuration, only database updates until then.
 ## How it works
 
 - **Build mode,** devopsy's default (no `mode:` in `config.yaml`): a release uploads the
-  whole project as git sees it (about 1 MB) and `deploy` runs `devopsy build`
-  there. Composer runs inside the image; `vendor/` and `web/core` are never
+  whole project as git sees it (about 1 MB) and devopsy builds the image
+  there before the release goes live, so a failed build changes nothing and
+  `deploy` only starts it. Composer runs inside the image; `vendor/` and `web/core` are never
   committed or uploaded. Docker's build cache makes a release without
   dependency changes take seconds: composer keeps its downloads in a
   BuildKit cache mount, and the image copies vendor, core and contrib in
@@ -254,10 +255,14 @@ With a local devopsy-template-traefik, the site is at
 `https://drupal11.localhost` (the config's project name):
 
 ```sh
-devopsy deploy
+devopsy --release
 devopsy drush site:install --yes
 devopsy drush uli
 ```
+
+`devopsy --release` runs the release steps in place, as a server does:
+secrets, the image built, then `deploy`. Run it again after changing the
+code; `devopsy up -d --build` only rebuilds and restarts.
 
 `.devopsy/mnt` holds the local database and files; `devopsy down` and
 deleting it starts over.
