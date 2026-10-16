@@ -14,7 +14,6 @@ secrets: [DB_PASSWORD, DRUPAL_HASH_SALT, SITE_BASIC_AUTH]
 defaults:
   release: {prepare: secrets, run: deploy}
   rollback: {prepare: secrets, run: deploy}
-  destroy: destroy
 environments:
   # inherit: variables every child gets from prod's server files, into
   # its shared/inherit.env, on its first release, every sync and
