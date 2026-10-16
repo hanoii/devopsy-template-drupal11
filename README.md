@@ -264,5 +264,6 @@ devopsy drush uli
 secrets, the image built, then `deploy`. Run it again after changing the
 code; `devopsy up -d --build` only rebuilds and restarts.
 
-`.devopsy/mnt` holds the local database and files; `devopsy down` and
-deleting it starts over.
+`.devopsy/mnt` holds the local database and files; `devopsy --destroy`
+removes them with the containers (its files are the app's and MariaDB's,
+which you cannot delete yourself), and `devopsy --release` starts over.
