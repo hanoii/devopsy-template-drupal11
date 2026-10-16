@@ -43,7 +43,7 @@ devopsy @prod goaccess > report.html   # or as an HTML report
 devopsy @prod --releases
 devopsy @prod --status         # the release, its containers, the URL, maintenance mode, Drupal's version
 devopsy @prod maintenance on   # take the site down on purpose, its page shown at once; off brings it back
-devopsy @prod --destroy        # remove it all: containers, database, files (runs destroy)
+devopsy @prod --destroy        # remove it all: containers, database, files
 ```
 
 The first release generates `DB_PASSWORD` and `DRUPAL_HASH_SALT` into the
@@ -75,10 +75,10 @@ configuration, only database updates until then.
   a bind mount of `.devopsy/mnt/storage` (on servers `shared/mnt/storage`)
   holding public files (`sites/default/files` links there) and private
   files, and `/app/logs` (`mnt/logs`), the access log.
-- **Destroying.** `destroy`, the environments' destroy step, takes the
-  containers down and empties `mnt/` from the database image as root: its
-  files belong to `app` and MariaDB's user, which the deploy user cannot
-  remove. Then devopsy removes the environment's directory.
+- **Destroying.** `devopsy @prod --destroy` is devopsy's alone: it takes
+  the containers, volumes and the built image down, empties `mnt/` as root
+  (its files belong to `app` and MariaDB's user), then removes the
+  environment's directory. No destroy step.
 - **Ownership.** `shared/mnt` belongs to the deploy user, so the entrypoint
   starts as root, gives `/app/storage` and `/app/logs` to `app`, and drops
   to `app` with `setpriv`. `drush` in the image is a wrapper that does the
