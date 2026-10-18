@@ -1,9 +1,11 @@
 #!/bin/sh
 # The sync capability's finish (devopsy-cli's README, "Capabilities"):
-# devopsy runs it on each side once that side's services are back,
-# with parent|child and go (the copy succeeded) or abort. Only the
-# child after go does anything, before its deploy: it holds prod's data
-# now, and what a copy should not keep goes here.
+# devopsy runs it on each side with parent|child and go (the copy is
+# complete, the services back), abort (nothing of the parent's was
+# written, the services back) or, on the child, partial (written in part:
+# the stopped services stay down until a sync completes, nothing to do
+# here). Only the child after go does anything, before its deploy: it
+# holds prod's data now, and what a copy should not keep goes here.
 set -eu
 [ "${1:-}" = child ] && [ "${2:-}" = go ] || exit 0
 
@@ -17,7 +19,13 @@ if ! devopsy exec -T app drush status --field=bootstrap </dev/null 2>/dev/null |
   echo "finish: Drupal is not installed here, nothing to sanitize" >&2
   exit 0
 fi
-devopsy exec -T app drush sql:sanitize --yes </dev/null
+# Unsanitized, prod's data is never served: the app goes down, and the
+# sync fails.
+if ! devopsy exec -T app drush sql:sanitize --yes </dev/null; then
+  echo "finish: sanitizing failed: stopping the app, which stays down until a sync completes" >&2
+  devopsy stop app </dev/null || true
+  exit 1
+fi
 
 # Closed by default: a child that inherits no SITE_BASIC_AUTH from prod,
 # and has none of its own, gets one here, once, printed this one time.
