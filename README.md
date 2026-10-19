@@ -163,8 +163,8 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   ever served. Later releases keep the child's data; `--sync` copies prod
   again and runs `deploy` afterwards. A copy that did not complete (cut
   halfway, a lost connection) leaves the child's app and database down,
-  and devopsy refuses releases and rollbacks there until a `--sync`
-  completes.
+  and devopsy refuses releases that do not sync, and rollbacks, until a
+  sync completes (`--sync` or `--release-sync`).
 - **What is copied:** `storage` (public and private files), the `app`
   service's mount (not `logs`, its access log: `devopsy.sync.rsync.exclude`
   keeps each environment's own), and the database's datadir, rsynced by
