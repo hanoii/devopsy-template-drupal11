@@ -8,7 +8,7 @@ as a starting point for a Drupal site.
 ## Using this template
 
 A starting point to own, not a dependency: start a project from it on
-GitHub ("Use this template"), or sync it and keep this repository as a
+GitHub ("Use this template"), or clone it and keep this repository as a
 remote (`upstream`) to pull its changes when you choose. Nothing updates
 your copy, or what runs on your servers, but your own release.
 
@@ -21,7 +21,7 @@ the environment:
 echo DEVOPSY_SERVER=devopsy@203.0.113.10 >> .devopsy/.env
 ```
 
-Each environment also gets `<project>-<environment>.<server's wildcard
+Each environment gets a URL, `<project>-<environment>.<server's wildcard
 domain>` (its compose project name, like `drupal11-prod`), whose domain each
 release imports from the server's proxy (devopsy-template-traefik), through the
 `devopsy.import` label in `compose.yaml`: a release fails while no proxy
@@ -57,11 +57,11 @@ configuration, only database updates until then.
 
 ## How it works
 
-- **Build mode,** devopsy's default (no `mode:` in `config.yaml`): a release uploads the
-  whole project as git sees it (about 1 MB) and devopsy builds the image
-  there before the release goes live, so a failed build changes nothing and
-  `deploy` only starts it. Composer runs inside the image; `vendor/` and `web/core` are never
-  committed or uploaded. Docker's build cache makes a release without
+- **Build mode,** devopsy's default (no `mode:` in `config.yaml`): a
+  release uploads the whole project as git sees it (about 1 MB) and devopsy
+  builds the image there before the release goes live, so a failed build
+  changes nothing and `deploy` only starts it. Composer runs inside the
+  image; `vendor/` and `web/core` are never committed or uploaded. Docker's build cache makes a release without
   dependency changes take seconds: composer keeps its downloads in a
   BuildKit cache mount, and the image copies vendor, core and contrib in
   their own layers before the code, so most releases only rebuild the code
@@ -101,8 +101,8 @@ configuration, only database updates until then.
   container's output (`devopsy @prod logs -f app`) and to
   `/app/logs/access.log`, a mount of its own (`.devopsy/mnt/logs`, on
   servers `shared/mnt/logs`), so it outlives containers and releases and
-  stays out of the site's files: rotated at 100MiB, old files compressed, 10 kept, 90 days at
-  most (`docker/Caddyfile`). `devopsy goaccess` opens it in
+  stays out of the site's files: rotated at 100MiB, old files compressed,
+  10 kept, 90 days at most (`docker/Caddyfile`). `devopsy goaccess` opens it in
   [GoAccess](https://goaccess.io), in its own container (the `goaccess`
   service, never started by `up`), where the site runs:
   its terminal view on a terminal, which follows new requests, an HTML
@@ -141,8 +141,9 @@ devopsy exec -T app sh -c 'cd /tmp/sync && tar c .' | tar x -C config/sync
 
 ## Rolling back
 
-`devopsy @prod --rollback` switches to the previous release and runs `deploy`
-there, which builds it again (from cache). Database updates are not undone.
+`devopsy @prod --rollback` switches to the previous release, with the
+image it ran (devopsy keeps each release's image: nothing is rebuilt), and
+runs `secrets` and `deploy` there. Database updates are not undone.
 
 ## Child environments
 
@@ -160,7 +161,10 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   `deploy`, devopsy copies prod's data into it, so `deploy` (database
   updates, config import, caches) runs on prod's data and no empty site is
   ever served. Later releases keep the child's data; `--sync` copies prod
-  again and runs `deploy` afterwards.
+  again and runs `deploy` afterwards. A copy that did not complete (cut
+  halfway, a lost connection) leaves the child's app and database down,
+  and devopsy refuses releases and rollbacks there until a `--sync`
+  completes.
 - **What is copied:** `storage` (public and private files), the `app`
   service's mount (not `logs`, its access log: `devopsy.sync.rsync.exclude`
   keeps each environment's own), and the database's datadir, rsynced by
@@ -203,9 +207,10 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   capability's `finish` runs on the child (`.devopsy/capabilities/sync/finish`):
   `drush sql:sanitize` scrubs every user's email and password, so no
   production password opens a child and no mail from it reaches anyone
-  (`devopsy @dev drush uli` logs you in), and a child with no
-  `SITE_BASIC_AUTH`, inherited or its own, gets one generated into its
-  `shared/.env`, user `preview`, the password printed that once. To open
+  (`devopsy @dev drush uli` logs you in); if it fails, the app is stopped
+  and the sync fails, so prod's data is never served unsanitized. A child
+  with no `SITE_BASIC_AUTH`, inherited or its own, gets one generated into
+  its `shared/.env`, user `preview`, the password printed that once. To open
   a child on purpose, set the variable empty and reload:
   `SITE_BASIC_AUTH= devopsy @dev --vars set SITE_BASIC_AUTH`, then
   `devopsy @dev reload`; set but empty stays open through later syncs,
