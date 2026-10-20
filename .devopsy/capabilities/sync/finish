@@ -12,7 +12,11 @@ set -eu
 # Emails and passwords, scrubbed by Drupal's own tool (user 1 included):
 # nobody logs into a child with a production password, and no mail from
 # a child reaches a real address. drush uli opens a session without one.
-# devopsy has the labeled services up by now, on a first release too.
+# devopsy has the labeled services up by now, on a first release too,
+# but only what the sync stopped: the app this hook stopped after a
+# failed sanitize is still down on the next sync's go. Started here, so
+# a site that is down is never taken for one not installed.
+devopsy up -d --wait app </dev/null
 # Nothing arrived (a parent without sync labels, or an empty one): no
 # site to sanitize, and deploy will say Drupal is not installed.
 if ! devopsy exec -T app drush status --field=bootstrap </dev/null 2>/dev/null | grep -q Successful; then
