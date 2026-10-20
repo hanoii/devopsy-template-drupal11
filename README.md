@@ -208,7 +208,8 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   `drush sql:sanitize` scrubs every user's email and password, so no
   production password opens a child and no mail from it reaches anyone
   (`devopsy @dev drush uli` logs you in); if it fails, the app is stopped
-  and the sync fails, so prod's data is never served unsanitized. A child
+  and the sync fails, so prod's data is never served unsanitized, and the
+  next sync's `finish` starts the app again to sanitize. A child
   with no `SITE_BASIC_AUTH`, inherited or its own, gets one generated into
   its `shared/.env`, user `preview`, the password printed that once. To open
   a child on purpose, set the variable empty and reload:
