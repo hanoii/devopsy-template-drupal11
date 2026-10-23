@@ -230,7 +230,7 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   keeps the database going forward only, and after a sync that copies
   the datadir the child runs the parent's exact image (a dump, below,
   loads through the child's own). Moving to the next series is an edit there
-  and one `--release --yes` per environment.
+  and one `--release --accept-image database` per environment.
 - **A dump instead:** `DATA_DATABASE=stream` on prod (`devopsy @prod
   --vars set --show DATA_DATABASE stream`; children inherit it, so both
   sides agree) streams the database instead of copying its datadir:
