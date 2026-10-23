@@ -2,8 +2,9 @@
 
 # Drupal on FrankenPHP (Caddy + PHP 8.4), built on the server by
 # `devopsy @<target> --release` (build mode, devopsy's default). Code is owned by root and
-# read-only; the only writable path at runtime is /app/storage, a bind mount
-# of .devopsy/mnt/storage (see docker/entrypoint).
+# read-only; the only writable paths at runtime are /tmp and the storage and
+# logs mounts (compose.yaml). No USER here: compose.yaml's user: runs the app
+# as APP_UID from its first process, with no capabilities.
 #
 # The build context is the project root (see compose.yaml), filtered by
 # Dockerfile.dockerignore next to this file.
@@ -59,8 +60,9 @@ RUN rm -rf web/sites/default/files \
 ########################################
 FROM base AS app
 
-# Not root, and not 1000: that is the devopsy deploy user on servers. See
-# "Conventions" in the devopsy workspace README.
+# Not root, and not 1000: that is the devopsy deploy user on servers. The
+# user only names the UID (and gives it /tmp as home): compose.yaml runs the
+# container as ${APP_UID:-10001} and passes the same value here.
 ARG APP_UID=10001
 
 # The root filesystem is read-only at runtime: Caddy keeps its data and config
@@ -71,6 +73,14 @@ ENV STORAGE_DIR=/app/storage \
 
 RUN useradd --uid ${APP_UID} --user-group --no-create-home --home-dir /tmp --shell /bin/bash app \
   && mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+# No privilege to gain: the app runs on 8080 without capabilities
+# (compose.yaml drops them all), so the binary's file capability for low
+# ports would only stop it from starting (execve refuses a file capability
+# the bounding set lacks: "operation not permitted"); and no setuid or
+# setgid binaries (su, passwd, mount...) for a shell in the container to use.
+RUN setcap -r /usr/local/bin/frankenphp \
+  && find / -xdev -perm /6000 -type f -exec chmod a-s {} +
 
 # Dependencies, each in its own layer. BuildKit keys these copies on their
 # content, so a layer whose files did not change keeps its digest even after
@@ -94,8 +104,7 @@ COPY --from=build --chmod=u=rwX,go=rX /app/vendor/autoload.php /app/vendor/autol
 COPY .devopsy/docker/Caddyfile /etc/frankenphp/Caddyfile
 COPY .devopsy/docker/php.ini "$PHP_INI_DIR/conf.d/zz-app.ini"
 COPY --chmod=755 .devopsy/docker/entrypoint /usr/local/bin/entrypoint
-# Keep /app/vendor/bin out of PATH: its drush would win over this wrapper and
-# run as root from `docker compose exec`.
+# drush with the site's root, whatever the working directory.
 COPY --chmod=755 .devopsy/docker/drush-wrapper /usr/local/bin/drush
 
 # The code: everything else, the layer most releases change.

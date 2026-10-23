@@ -67,9 +67,18 @@ configuration, only database updates until then.
   their own layers before the code, so most releases only rebuild the code
   layer (well under 1 MB here).
 - **The image** (`.devopsy/Dockerfile`): FrankenPHP (Caddy and PHP 8.4). Code
-  is owned by root and readable only; the app runs as `app`, UID 10001, never
-  root and never 1000, the deploy user on devopsy servers. The UID is fixed in
-  the image, not passed around as a setting.
+  is owned by root and readable only. It has no setuid or setgid binaries
+  and no file capabilities (FrankenPHP's, for ports below 1024, is
+  removed: the app listens on 8080).
+- **No privilege.** Every container runs as a user of its own from its
+  first process, never root: the app (and alwaysup and the tools) as
+  `APP_UID`, 10001 by default (never 1000, the deploy user on devopsy
+  servers), MariaDB as its image's user, 999. Each drops every
+  capability and sets `no-new-privileges` (alwaysup keeps the one its
+  upstream Caddy binary needs to start), so a compromised app finds no
+  way up: `devopsy @prod --shell app --user root` is a root without
+  capabilities, which cannot read the app's mode-600 files, chown
+  anything or install packages.
 - **Read-only.** The container's root filesystem is read-only. The only
   writable paths are `/tmp` (a tmpfs, also Caddy's state), `/app/storage`,
   a bind mount of `.devopsy/mnt/storage` (on servers `shared/mnt/storage`)
@@ -79,14 +88,17 @@ configuration, only database updates until then.
   the containers, volumes and the built image down, empties `mnt/` as root
   (its files belong to `app` and MariaDB's user), then removes the
   environment's directory. No destroy step.
-- **Ownership.** `shared/mnt` belongs to the deploy user, so the entrypoint
-  starts as root, gives `/app/storage` and `/app/logs` to `app`, and drops
-  to `app` with `setpriv`. `drush` in the image is a wrapper that does the
-  same, so `devopsy exec app drush` never runs as root. `devopsy --shell`
-  opens bash as `app` too: `compose exec` skips the entrypoint, so the
-  `app` service's labels say so (`devopsy.shell=true`,
-  `devopsy.shell.user=app`). `devopsy --shell app --user root` for root,
-  `devopsy --shell database` for another service.
+- **Ownership.** devopsy owns the mounts: `devopsy.mnt.owner` on a
+  service (`compose.yaml`) makes it create that service's entries of
+  `mnt` and give them to the service's user at every release, whatever
+  owner their files arrived with (a sync, an import, a copy by hand):
+  `storage` and `logs` to `APP_UID`, `database` to 999. So nothing starts
+  as root to chown, and this needs a devopsy with that label: an older
+  one leaves a new environment's entries as Docker creates them, root's,
+  and the app refuses to start, saying so. `drush`, `compose exec` and
+  `devopsy --shell` (bash, the `app` service's `devopsy.shell` label) run
+  as the service's user too; `devopsy --shell database` for another
+  service.
 - **Settings** (`web/sites/default/settings.php`) come from the environment
   set in `compose.yaml`: database, hash salt, any host (Traefik only routes
   the environment's own), and Traefik as the reverse proxy for client IPs

@@ -1,12 +1,8 @@
 #!/bin/sh
-# Container entrypoint.
-#
-# Starts as root to prepare the storage and logs mounts, then drops
-# privileges to the app user with setpriv. On servers the mount is created by
-# devopsy's deploy user, so the first start chowns it; the recursive chown runs
-# only when the content does not belong to the app user yet.
-#
-# When not started as root (docker run --user, etc.) it only runs the command.
+# Container entrypoint. It runs as whatever user the container runs as
+# (compose.yaml's user:, APP_UID), never needing root or a capability:
+# devopsy gives the storage and logs mounts to that user before the
+# release starts it (compose.yaml's devopsy.mnt.owner).
 set -eu
 
 STORAGE_DIR="${STORAGE_DIR:-/app/storage}"
@@ -29,22 +25,10 @@ if [ "${1:-}" = frankenphp ] && [ -n "${SITE_BASIC_AUTH:-}" ]; then
   echo "entrypoint: basic auth enabled for $SITE_BASIC_AUTH_USER" >&2
 fi
 
-if [ "$(id -u)" != "0" ]; then
-  exec "$@"
+# Public and private files (web/sites/default/files links to public/).
+if ! mkdir -p "$STORAGE_DIR/public" "$STORAGE_DIR/private"; then
+  echo "entrypoint: $STORAGE_DIR is not writable by UID $(id -u): it must be owned by the container's user (devopsy.mnt.owner in compose.yaml, which devopsy applies)" >&2
+  exit 1
 fi
 
-app_uid="$(id -u app)"
-if [ -d "$STORAGE_DIR/public" ] && [ "$(stat -c %u "$STORAGE_DIR/public")" != "$app_uid" ]; then
-  echo "entrypoint: chown -R app $STORAGE_DIR" >&2
-  chown -R app:app "$STORAGE_DIR"
-fi
-
-# Create (or fix the owner of) the mount point and its subdirectories.
-install -d -o app -g app "$STORAGE_DIR" "$STORAGE_DIR/public" "$STORAGE_DIR/private"
-
-# The access log's mount (docker/Caddyfile): docker creates it as root.
-if [ -d /app/logs ]; then
-  chown app:app /app/logs
-fi
-
-exec setpriv --reuid=app --regid=app --init-groups env HOME=/tmp "$@"
+exec "$@"
