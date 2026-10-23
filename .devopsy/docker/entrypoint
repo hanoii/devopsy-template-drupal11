@@ -35,6 +35,20 @@ if ! mountpoint -q "$STORAGE_DIR"; then
   echo "entrypoint: $STORAGE_DIR is not a mount: compose.yaml mounts mnt/storage there" >&2
   exit 1
 fi
+# No symlinks in public files: Caddy's file_server follows them, and has no
+# setting not to, so a link the app was tricked into writing
+# (public/p -> /app/storage/private, /app/logs, /proc/self/environ) would
+# serve its target to anyone, and keep serving it across releases, after
+# the hole is closed. Drupal never creates one there. Removed at every
+# start, each one said; one that cannot be removed fails the start.
+if [ -e "$STORAGE_DIR/public" ] || [ -L "$STORAGE_DIR/public" ]; then
+  find "$STORAGE_DIR/public" -type l -exec sh -c '
+    for link; do
+      echo "entrypoint: removing the symlink $link (to $(readlink "$link")): public files are never links" >&2
+      rm -f "$link" || { echo "entrypoint: cannot remove $link" >&2; exit 1; }
+    done
+  ' sh {} +
+fi
 for dir in "$STORAGE_DIR/public" "$STORAGE_DIR/private"; do
   if [ -e "$dir" ] && [ ! -d "$dir" ]; then
     echo "entrypoint: $dir is not a directory" >&2

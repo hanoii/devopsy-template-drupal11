@@ -87,7 +87,11 @@ configuration, only database updates until then.
   files, and `/app/logs` (`mnt/logs`), the access log. Caddy never runs
   PHP from `sites/`, however a request writes the path (path info, any
   case, a directory's `index.php`): what the app writes there is only
-  ever served as a file (`.devopsy/docker/Caddyfile`).
+  ever served as a file (`.devopsy/docker/Caddyfile`). Nor a link: Caddy
+  follows symlinks, so one written into public files would serve its
+  target (private files, the access log) to anyone, across releases.
+  Drupal never creates them, and the app removes any under
+  `storage/public` at every start, saying so in its log.
   Compiled Twig (PHP that Drupal includes) lives in `/tmp/php`, never in
   `storage/public/php` (Drupal's default), so it cannot outlive the
   container; `drush cr` clears it. A site installed before can remove
