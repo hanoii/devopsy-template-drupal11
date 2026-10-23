@@ -139,6 +139,19 @@ configuration, only database updates until then.
   `.env`, and both follow.
 - **Code changes need a release.** OPcache never revalidates (the code cannot
   change), and modules are added with composer, then released.
+- **PHP updates come with releases.** The image builds on FrankenPHP's
+  floating `1-php8.4-trixie` tag, and devopsy builds with `--pull`, so
+  every release builds on that tag's current image: PHP's security fixes
+  reach an environment at its next release, and nothing before. After a
+  PHP advisory, release each environment (`devopsy @prod --release`, and
+  its children) and check `devopsy @prod --status`, which says the PHP
+  the app runs. MariaDB is pinned instead ("Child environments": a raw
+  datadir must never meet an older server). Requests are kept small for
+  PHP's parser (`.devopsy/docker/php.ini`): uploads up to
+  `PHP_UPLOAD_MAX_SIZE`, 32M by default (per target in `.env`), no upload
+  progress, nesting up to 32. `.devopsy/docker/Caddyfile` has
+  `disable_functions` for web requests ready, commented out: it blocks
+  the shell behind most exploits and breaks modules that shell out.
 
 ## Changing configuration
 

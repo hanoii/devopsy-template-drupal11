@@ -16,8 +16,17 @@ if [ -f "$DEVOPSY_PROJECT_DIR/mnt/maintenance/on" ]; then
 else
   echo "maintenance  off"
 fi
-# Drupal, when the app runs: its version and whether it is installed.
+# When the app runs: the PHP it runs (FrankenPHP's own, which serves the
+# site; an advisory's fix arrives with the next release, which builds on
+# the base image's current tag), then Drupal's version and whether it is
+# installed.
 if devopsy ps --services --status running 2>/dev/null | grep -qx app; then
+  # "FrankenPHP v1.13.0 PHP 8.4.27 Caddy v2.11.7 h1:...".
+  php=$(devopsy exec -T app frankenphp version </dev/null 2>/dev/null |
+    sed -n 's/^FrankenPHP v\([^ ]*\) PHP \([^ ]*\) .*/\2 (FrankenPHP \1)/p' || true)
+  if [ -n "$php" ]; then
+    echo "php          $php"
+  fi
   version=$(devopsy exec -T app drush status --field=drupal-version </dev/null 2>/dev/null || true)
   if [ -n "$version" ]; then
     if devopsy exec -T app drush status --field=bootstrap </dev/null 2>/dev/null | grep -q Successful; then
