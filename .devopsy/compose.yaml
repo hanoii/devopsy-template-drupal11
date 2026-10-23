@@ -110,7 +110,8 @@ services:
     # (DATA_DATABASE=stream) loads through the child's own image.
     # MARIADB_AUTO_UPGRADE updates the system tables on start. Never
     # `mariadb:11`: a plain release would cross series. Moving to the next
-    # LTS is an edit here, then one `--release --accept-image database` per environment.
+    # LTS is an edit here, then one `--release --accept-image database`
+    # per environment.
     image: mariadb:11.8
     restart: unless-stopped
     # As the image's mysql user (999) from the first process, without
