@@ -6,6 +6,9 @@
 # logs mounts (compose.yaml). No USER here: compose.yaml's user: runs the app
 # as APP_UID from its first process, with no capabilities.
 #
+# The base is a floating tag on purpose: build mode builds with --pull, so
+# every release builds on its current image, PHP's security fixes included.
+#
 # The build context is the project root (see compose.yaml), filtered by
 # Dockerfile.dockerignore next to this file.
 #
