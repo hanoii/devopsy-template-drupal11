@@ -74,20 +74,53 @@
 		{$SITE_BASIC_AUTH_USER:admin} {$SITE_BASIC_AUTH_HASH:$2a$10$kMUNBF5FnoGFGaDNESttce7OOf9mPSS/6Bh34E.DC47g3Yh9gpeNe}
 	}
 
-	# Same as Drupal's .htaccess rules: no hidden paths at any level, except .well-known.
-	@dotfiles {
-		path_regexp /\.
-		not path /.well-known/*
+	# What is refused or served, in this order: a route keeps it, where
+	# Caddy would sort respond after route. PHP is php_server written out,
+	# as FrankenPHP 1.13 expands it (`frankenphp adapt`), with one step of
+	# ours between its rewrite and its php handler: there the path is the
+	# script PHP would run, however the request wrote it, with path info
+	# (evil.php/x, evil.php%2Fx), in any case (PHP splits at .php ignoring
+	# it), with dot segments or doubled slashes, or as a directory whose
+	# index.php the rewrite picks (no .php in the request at all). A regex
+	# on the request path missed some of those.
+	route {
+		# Same as Drupal's .htaccess rules: no hidden paths at any level, except .well-known.
+		@dotfiles {
+			path_regexp /\.
+			not path /.well-known/*
+		}
+		respond @dotfiles 403
+
+		# Code, config and backup files that must never be served.
+		@sensitive path_regexp \.(engine|inc|install|make|module|profile|po|sh|.*sql|theme|twig|tpl(\.php)?|xtmpl|yml)(~|\.sw[op]|\.bak|\.orig|\.save)?$|^/(Entries.*|Repository|Root|Tag|Template|composer\.(json|lock)|web\.config)$|^/#.*#$|\.php(~|\.sw[op]|\.bak|\.orig|\.save)$
+		respond @sensitive 403
+
+		# A directory with an index.php gets its trailing slash.
+		@canonicalPath {
+			file {path}/index.php
+			not path */
+		}
+		redir @canonicalPath {http.request.orig_uri.path}/ 308
+
+		# The file asked for (up to its .php, the rest is path info), a
+		# directory's index.php, else Drupal's index.php.
+		@indexFiles file {
+			try_files {path} {path}/index.php index.php
+			try_policy first_exist_fallback
+			split_path .php
+		}
+		rewrite @indexFiles {file_match.relative}{file_match.remainder}
+
+		# Never run PHP from sites/: uploaded files (sites/default/files is
+		# the storage mount, the only place the app can write under the web
+		# root) and settings.php. Not anchored at the end and ignoring case,
+		# as PHP's split. A missing file was rewritten to index.php above,
+		# so image style derivatives still reach Drupal.
+		@sites_php path_regexp (?i)^/sites/.*\.ph(p|ar|tml)
+		respond @sites_php 403
+
+		@phpFiles path *.php *.php/*
+		php @phpFiles
+		file_server
 	}
-	respond @dotfiles 403
-
-	# Code, config and backup files that must never be served.
-	@sensitive path_regexp \.(engine|inc|install|make|module|profile|po|sh|.*sql|theme|twig|tpl(\.php)?|xtmpl|yml)(~|\.sw[op]|\.bak|\.orig|\.save)?$|^/(Entries.*|Repository|Root|Tag|Template|composer\.(json|lock)|web\.config)$|^/#.*#$|\.php(~|\.sw[op]|\.bak|\.orig|\.save)$
-	respond @sensitive 403
-
-	# Never run PHP from sites/ (uploaded files, settings.php).
-	@sites_php path_regexp ^/sites/.*\.(php|phar|phtml)$
-	respond @sites_php 403
-
-	php_server
 }
