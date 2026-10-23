@@ -18,19 +18,19 @@ environments:
   # inherit: variables every child gets from prod's server files, into
   # its shared/inherit.env, on its first release, every sync and
   # --inherit (devopsy-cli's README, "Parent environments and syncs"):
-  # SYNC_DATABASE, so both sides copy the database the same way
+  # DATA_DATABASE, so both sides copy the database the same way
   # (compose.yaml); DB_PASSWORD, so a raw datadir (which carries prod's
   # password) and a dump (imported into a database created with it) both
   # work, and switching between them under an existing child too;
   # SITE_BASIC_AUTH, so copies of a closed site stay closed, with prod's
   # login. Unset on prod, nothing is written.
   prod:
-    inherit: [SYNC_DATABASE, DB_PASSWORD, SITE_BASIC_AUTH]
+    inherit: [DATA_DATABASE, DB_PASSWORD, SITE_BASIC_AUTH]
   # Children: syncd from prod on their first release, before deploy, and
   # again with `devopsy @dev --sync`: files and the database's datadir
   # rsynced by devopsy with both stopped, or the database streamed
-  # (SYNC_DATABASE=stream: capabilities/sync/export and import) with the
-  # site running; each keeps its own shared/.env otherwise.
+  # (DATA_DATABASE=stream: capabilities/data/export and import) with
+  # prod's site running; each keeps its own shared/.env otherwise.
   dev: {parent: prod}
   "pr-*":                         # pull request environments: @pr-123
     parent: prod
