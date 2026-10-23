@@ -1,11 +1,12 @@
 # The build context is the project root. BuildKit reads this file because it
 # sits next to the Dockerfile (Dockerfile.dockerignore).
 
-# VCS and local tooling
+# VCS, worktrees and local tooling
 .git
 .ddev
 .idea
 node_modules
+.worktrees
 
 # devopsy's local and server-only files: secrets and data
 .devopsy/.env
