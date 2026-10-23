@@ -118,6 +118,13 @@ services:
       - ALL
     security_opt:
       - no-new-privileges
+    read_only: true
+    # The only writable paths: the datadir (below), /run/mysqld (its
+    # socket and pid file, the mysql user's: a tmpfs is root's unless told
+    # otherwise) and /tmp.
+    tmpfs:
+      - /run/mysqld:uid=999,gid=999,mode=755
+      - /tmp
     environment:
       MARIADB_DATABASE: drupal
       MARIADB_USER: drupal
