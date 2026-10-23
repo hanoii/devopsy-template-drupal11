@@ -268,7 +268,7 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   `depends_on` a stopped one stops with it, the app with the database.
   Set it yourself to choose otherwise, but never copy a running datadir:
   with `mnt` on the database, keep it `own`.
-- **Always there: `alwaysup`.** A small Caddy (as 10001, read-only,
+- **Always there: `alwaysup`.** A small Caddy (as `APP_UID`, read-only,
   `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule on a router
   at priority 2, below the app's: Traefik sends visitors straight to the
   app while its container runs, and to `alwaysup` only while the app's
