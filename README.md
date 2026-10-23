@@ -78,7 +78,9 @@ configuration, only database updates until then.
   upstream Caddy binary needs to start), so a compromised app finds no
   way up: `devopsy @prod --shell app --user root` is a root without
   capabilities, which cannot read the app's mode-600 files, chown
-  anything or install packages.
+  anything or install packages. Never run drush as root: it leaves
+  root's files in `/tmp/php` and storage that the app cannot replace.
+  `devopsy @prod drush`, `exec` and `--shell` run as the app by default.
 - **Read-only.** Every container's root filesystem is read-only
   (MariaDB writes its datadir, and its socket in a tmpfs). The app's only
   writable paths are `/tmp` (a tmpfs, also Caddy's state), `/app/storage`,

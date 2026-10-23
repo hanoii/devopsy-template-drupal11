@@ -114,6 +114,11 @@ the environment (`web/sites/default/settings.php`).
 - **`drush` is a wrapper for `--root` only:** it went through the
   entrypoint to never run as root from `compose exec`, which now runs
   as the service's user.
+- **Never drush as root** (`--user 0`, `--shell app --user root`): what
+  it writes (compiled Twig in `/tmp/php`, files in storage) is root's,
+  which the app cannot replace, and as a root without capabilities it
+  cannot write into the app's own directories at all. Run it as the app,
+  `exec`'s default user.
 - **MariaDB as 999 from the start:** the official image's entrypoint
   starts as root only to chown its datadir and skips that when started
   as its user, provided the datadir is 999's, which the label
