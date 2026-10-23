@@ -98,9 +98,15 @@ the environment (`web/sites/default/settings.php`).
 - **MariaDB as 999 from the start:** the official image's entrypoint
   starts as root only to chown its datadir and skips that when started
   as its user, provided the datadir is 999's, which the label
-  guarantees. Checked on 11.8.9 with no capabilities: a first start on
-  an empty entry, a restart, an upgrade start from 11.4 with
-  `MARIADB_AUTO_UPGRADE`, and the stream export and import. Its image
+  guarantees. Read-only too: it writes only the datadir, `/run/mysqld`
+  (socket and pid file) and `/tmp`, both tmpfs, the first given to 999
+  with tmpfs options (`uid=999,gid=999`; a tmpfs is root's otherwise,
+  and Compose's long syntax has no owner). Checked on 11.8.9 with no
+  capabilities: a first start on an empty entry, a restart, an upgrade
+  start from 11.4 with `MARIADB_AUTO_UPGRADE`, and the stream export and
+  import; read-only, a first start, a restart and a recreate, the
+  healthcheck, `mariadb-dump`, and `--export`/`--import database` with
+  `mnt` and `stream`. Its image
   keeps its setuid binaries (not ours to rebuild); without capabilities
   and with `no-new-privileges` they give nothing. Its log warns that
   `io_uring_queue_init()` failed with EPERM: Docker's seccomp profile,

@@ -79,7 +79,8 @@ configuration, only database updates until then.
   way up: `devopsy @prod --shell app --user root` is a root without
   capabilities, which cannot read the app's mode-600 files, chown
   anything or install packages.
-- **Read-only.** The container's root filesystem is read-only. The only
+- **Read-only.** Every container's root filesystem is read-only
+  (MariaDB writes its datadir, and its socket in a tmpfs). The app's only
   writable paths are `/tmp` (a tmpfs, also Caddy's state), `/app/storage`,
   a bind mount of `.devopsy/mnt/storage` (on servers `shared/mnt/storage`)
   holding public files (`sites/default/files` links there) and private
