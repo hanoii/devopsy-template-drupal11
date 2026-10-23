@@ -63,6 +63,16 @@ the environment (`web/sites/default/settings.php`).
   and `report.php.pdf`, and their image style derivatives once written.
   When FrankenPHP's php_server changes, compare `frankenphp adapt` of a
   bare `php_server` with the route.
+- **No symlinks in public files:** the entrypoint removes every one
+  under `storage/public` at each start, saying which (`docker/entrypoint`),
+  and fails when it cannot. Caddy's file_server follows links and has no
+  setting not to (checked: Caddy 2's file_server has none, nor
+  FrankenPHP), so a link the app was tricked into writing
+  (`public/p -> /app/storage/private`, `/app/logs`, `/proc/self/environ`)
+  serves its target anonymously, whatever it holds later, and outlives
+  releases. Drupal never creates one there. Demonstrated: private files
+  and the access log served through such links, gone after a restart.
+  Between its creation and the next start a link is served (accepted).
 - **Pin MariaDB exactly** (`mariadb:11.8.9`), and bump it on purpose: a
   sync copies the datadir raw between servers, and a server keeps the
   image it pulled first, so a floating tag would let a datadir meet an
@@ -90,8 +100,9 @@ the environment (`web/sites/default/settings.php`).
   listen on 8080. alwaysup runs the upstream Caddy image unchanged,
   whose binary carries the same capability: hence its `cap_add:
   [NET_BIND_SERVICE]`.
-- **The entrypoint only hashes the basic-auth password and creates
-  `public/` and `private/`:** it ran as root before, to chown the mounts
+- **The entrypoint only hashes the basic-auth password, removes
+  symlinks from public files (above) and creates `public/` and
+  `private/`:** it ran as root before, to chown the mounts
   and drop to `app` with `setpriv`, which also left Docker's default
   capabilities in the bounding set. It fails with a message saying
   which: `storage` not a mount (missing on the read-only root, or in the
@@ -171,6 +182,13 @@ devopsy exec -T app sh -c 'cd storage/public && rm -rf t.php t.PHP t'
 Files whose names only contain `.php` are served (200): `my.pharmacy.jpg`
 and `report.php.pdf` in `storage/public`, and an image style derivative
 of the first, requested twice (the second from the file Drupal wrote).
+A symlink the app plants in public files is gone after a restart, and
+the app's log names it:
+
+```sh
+devopsy exec -T app ln -s /app/storage/private storage/public/p
+devopsy restart app && devopsy logs app | grep 'removing the symlink'
+```
 
 Then the site: the installer, an image
 upload with an image style, `drush uli`, `drush cr`, `config:export
