@@ -119,6 +119,9 @@ the environment (`web/sites/default/settings.php`).
   which the app cannot replace, and as a root without capabilities it
   cannot write into the app's own directories at all. Run it as the app,
   `exec`'s default user.
+- **`accesslog` prints no control characters:** the app writes the log
+  and a request's URL can hold any byte, so jq strips them (C0, DEL and
+  C1) from every field before they reach the operator's terminal.
 - **MariaDB as 999 from the start:** the official image's entrypoint
   starts as root only to chown its datadir and skips that when started
   as its user, provided the datadir is 999's, which the label
