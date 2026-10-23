@@ -84,6 +84,10 @@ configuration, only database updates until then.
   a bind mount of `.devopsy/mnt/storage` (on servers `shared/mnt/storage`)
   holding public files (`sites/default/files` links there) and private
   files, and `/app/logs` (`mnt/logs`), the access log.
+  Compiled Twig (PHP that Drupal includes) lives in `/tmp/php`, never in
+  `storage/public/php` (Drupal's default), so it cannot outlive the
+  container; `drush cr` clears it. A site installed before can remove
+  `storage/public/php` by hand once released.
 - **Destroying.** `devopsy @prod --destroy` is devopsy's alone: it takes
   the containers, volumes and the built image down, empties `mnt/` as root
   (its files belong to `app` and MariaDB's user), then removes the

@@ -43,6 +43,10 @@ the environment (`web/sites/default/settings.php`).
   no owner label and stay the deploy user's.
 - **Everything written at runtime lives in `mnt` or `/tmp`:** the
   release tree is read-only and goes with the next release.
+  Compiled Twig is PHP Drupal includes, so it goes to `/tmp/php`
+  (`php_storage` in settings.php), not to `public://php`, where it would
+  outlive releases; an existing site's `storage/public/php` can be
+  removed by hand once released.
 - **Pin MariaDB exactly** (`mariadb:11.8.9`), and bump it on purpose: a
   sync copies the datadir raw between servers, and a server keeps the
   image it pulled first, so a floating tag would let a datadir meet an

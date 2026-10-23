@@ -27,6 +27,13 @@ $settings['config_sync_directory'] = dirname(DRUPAL_ROOT) . '/config/sync';
 $settings['file_private_path'] = '/app/storage/private';
 $settings['file_temp_path'] = '/tmp';
 
+// Compiled Twig is PHP that Drupal includes. By default it is written to
+// public://php, which persists across releases, so code running as the app
+// could leave PHP there. /tmp is the container's tmpfs, rebuilt at each
+// start. drush runs in the same container, so `drush cr` clears what the web
+// server compiled.
+$settings['php_storage']['default']['directory'] = '/tmp/php';
+
 // The code is read-only: no module or theme installs from the UI.
 $settings['update_free_access'] = FALSE;
 $settings['allow_authorize_operations'] = FALSE;
