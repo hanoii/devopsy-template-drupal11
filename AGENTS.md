@@ -155,11 +155,11 @@ check chowns to another user. PHP the app writes into its files never
 runs (every line 403; from inside the container, past basic auth):
 
 ```sh
-devopsy exec -T app sh -c 'cd storage/public && echo "<?php echo 1;" > t.php && cp t.php t.PHP && mkdir -p t && cp t.php t/index.php'
+devopsy exec -T app sh -c 'cd storage/public && mkdir -p t && for f in t.php t.PHP t/index.php; do echo "<?php echo 1;" > $f; done'
 for p in t.php t.php/x t.php%2Fx t.PHP t.PHP/x t/ ../files/t.php; do
   devopsy exec -T app curl -s --path-as-is -o /dev/null -w "%{http_code} $p\n" "http://localhost:8080/sites/default/files/$p"
 done
-devopsy exec -T app sh -c 'cd storage/public && rm -r t.php t.PHP t'
+devopsy exec -T app sh -c 'cd storage/public && rm -rf t.php t.PHP t'
 ```
 
 Then the site: the installer, an image
