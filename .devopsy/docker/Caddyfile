@@ -27,7 +27,18 @@
 		include http.log.access
 	}
 
-	frankenphp
+	frankenphp {
+		# PHP's functions that run a program, disabled for web requests:
+		# uncomment to block the shell behind most exploit chains and
+		# webshells (code running as the app could still do anything PHP
+		# itself can). It breaks what shells out during a request, like
+		# ImageMagick's toolkit through exec, or a module running git or
+		# a converter: try the site's uploads and image styles after
+		# turning it on. Here, not in php.ini: FrankenPHP's php_ini
+		# applies to the web server only, while php.ini also reaches
+		# drush, which needs proc_open.
+		# php_ini disable_functions exec,shell_exec,system,passthru,proc_open,popen
+	}
 }
 
 :8080 {
