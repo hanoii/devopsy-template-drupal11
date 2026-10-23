@@ -69,18 +69,17 @@ services:
       # has no router for it and the alwaysup service's (below, priority
       # 2) answers instead: it waits for the app and streams its answer,
       # or shows the maintenance page.
-      # Syncs (devopsy @<child> --sync, and a child's first release):
-      # devopsy rsyncs storage. By default the app is stopped on both
-      # sides for the whole copy, with the database, so files and
-      # database come from the same moment (in-flight requests finish
-      # first, see stop_grace_period; alwaysup answers meanwhile).
-      # SYNC_APP_STOP is false when the database is streamed
-      # (capabilities/env/compute): the site keeps running and its files
-      # are copied as they are.
-      - devopsy.sync=rsync
-      - devopsy.sync.stop=${SYNC_APP_STOP:-true}
+      # Data (syncs, --export, --import): its files are its entries of
+      # mnt. import: it is down while any data is imported (a child's
+      # sync, an --import of the database), so it never runs on a
+      # half-loaded database (in-flight requests finish first, see
+      # stop_grace_period; alwaysup answers meanwhile); its own files are
+      # exported while it runs. With the database copied as files (own),
+      # it also stops with it on both sides, depending on it.
+      - devopsy.data=mnt
+      - devopsy.data.stop=import
       # The access log stays the environment's own: never copied.
-      - devopsy.sync.rsync.exclude=logs
+      - devopsy.data.exclude=logs
     # Stopping waits for Caddy to finish the requests in flight (a sync,
     # a deploy): Compose's default is 10s.
     stop_grace_period: 30s
@@ -116,21 +115,23 @@ services:
       start_period: 60s
       start_interval: 1s
     labels:
-      # Syncs: SYNC_DATABASE (set on prod, inherited by children so both
-      # sides agree). rsync, the default: devopsy copies the datadir raw
-      # with the database stopped on both sides (SYNC_DATABASE_STOP),
-      # consistent, prod down for the copy. Never copy a running datadir:
-      # it is not a consistent image. The datadir carries prod's users
-      # and passwords, hence DB_PASSWORD in prod's inherit:. stream:
-      # capabilities/sync/export dumps the running parent's database and
-      # capabilities/sync/import loads it into the child's (created with
-      # the same, inherited, password); both stay up
-      # (capabilities/env/compute sets SYNC_DATABASE_STOP and
-      # SYNC_APP_STOP to false), prod included. The same scripts serve
-      # devopsy @prod --export database > dump.sql and devopsy --import
-      # database < dump.sql.
-      - devopsy.sync=${SYNC_DATABASE:-rsync}
-      - devopsy.sync.stop=${SYNC_DATABASE_STOP:-true}
+      # Data: DATA_DATABASE (set on prod, inherited by children so both
+      # sides agree). mnt, the default: the datadir raw, with the database
+      # stopped while its data moves (own: on both sides of a sync, around
+      # its --export and --import), the app with it; consistent, prod down
+      # for the copy. Never copy a running datadir: it is not a
+      # consistent image. The datadir carries prod's users and passwords,
+      # hence DB_PASSWORD in prod's inherit:. stream:
+      # capabilities/data/export dumps the running database and
+      # capabilities/data/import loads it (into a child's created with the
+      # same, inherited, password); the database stays up
+      # (capabilities/env/compute sets DATA_DATABASE_STOP to never), prod
+      # and its app included, and the importing side's app is down for
+      # the load. The same scripts serve devopsy @prod --export database >
+      # dump.sql and devopsy --import database < dump.sql. none
+      # (DATA_DATABASE=none) leaves the database out of every copy.
+      - devopsy.data=${DATA_DATABASE:-mnt}
+      - devopsy.data.stop=${DATA_DATABASE_STOP:-own}
 
   # alwaysup answers for the app while its router is gone: stopped for a
   # sync or a deploy, recreating, unhealthy. Caddy tries the app every
@@ -141,8 +142,9 @@ services:
   # on`: mnt/maintenance/on exists) the page shows at once. Its router has
   # the app's rule at priority 2, below the app's, so Traefik only sends
   # requests here while the app's router is gone: no middleman otherwise,
-  # and nothing needed from the server's Traefik. No devopsy.sync label:
-  # syncs never stop it, and never copy the flag. As 10001, read-only;
+  # and nothing needed from the server's Traefik. No devopsy.data label,
+  # and no depends_on on the app (it would stop with it): copies never
+  # stop it, and never copy the flag. As 10001, read-only;
   # Caddy's directories are tmpfs, nothing is persisted.
   alwaysup:
     image: caddy:2.11.7-alpine

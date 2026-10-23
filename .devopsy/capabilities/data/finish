@@ -1,5 +1,5 @@
 #!/bin/sh
-# The sync capability's finish (devopsy-cli's README, "Capabilities"):
+# The data capability's finish (devopsy-cli's README, "Capabilities"):
 # devopsy runs it on each side with parent|child and go (the copy is
 # complete, the services back), abort (nothing of the parent's was
 # written, the services back) or, on the child, partial (written in part:
@@ -12,8 +12,8 @@ set -eu
 # Emails and passwords, scrubbed by Drupal's own tool (user 1 included):
 # nobody logs into a child with a production password, and no mail from
 # a child reaches a real address. drush uli opens a session without one.
-# devopsy has the labeled services up by now, on a first release too,
-# but only what the sync stopped: the app this hook stopped after a
+# devopsy has the services with data up by now, and what the sync
+# stopped, on a first release too, but only what the sync stopped: the app this hook stopped after a
 # failed sanitize is still down on the next sync's go. Started here, so
 # a site that is down is never taken for one not installed.
 devopsy up -d --wait app </dev/null

@@ -166,45 +166,50 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   and devopsy refuses releases that do not sync, and rollbacks, until a
   sync completes (`--sync` or `--release-sync`).
 - **What is copied:** `storage` (public and private files), the `app`
-  service's mount (not `logs`, its access log: `devopsy.sync.rsync.exclude`
+  service's mount (not `logs`, its access log: `devopsy.data.exclude`
   keeps each environment's own), and the database's datadir, rsynced by
-  devopsy from prod's server with the app and the database stopped on
-  both sides (the app first: its requests in flight finish, then the
-  database): files and database from the same moment, and prod is down
-  for as long as the copy takes (the first time everything, later only
-  what changed), its visitors waiting on `alwaysup` meanwhile (below).
-  The datadir carries prod's users and password
-  hashes, and the image's root password is random, so children use prod's
-  `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the child's own.
-  A raw copy needs the same MariaDB on both sides (older cannot read
-  newer), so `compose.yaml` pins the exact version: bump it there, and
-  each environment upgrades at its next release.
-- **A dump instead:** `SYNC_DATABASE=stream` on prod (`devopsy @prod
-  --vars set --show SYNC_DATABASE stream`; children inherit it, so both
+  devopsy from prod's server with the database stopped on both sides
+  (`own`) and the app with it, depending on it (the app first: its
+  requests in flight finish, then the database): files and database from
+  the same moment, and prod is down for as long as the copy takes (the
+  first time everything, later only what changed), its visitors waiting
+  on `alwaysup` meanwhile (below). The datadir carries prod's users and
+  password hashes, and the image's root password is random, so children
+  use prod's `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the
+  child's own. A raw copy needs the same MariaDB on both sides (older
+  cannot read newer), so `compose.yaml` pins the exact version: bump it
+  there, and each environment upgrades at its next release.
+- **A dump instead:** `DATA_DATABASE=stream` on prod (`devopsy @prod
+  --vars set --show DATA_DATABASE stream`; children inherit it, so both
   sides agree) streams the database instead of copying its datadir:
-  devopsy runs `.devopsy/capabilities/sync/export database` on prod,
+  devopsy runs `.devopsy/capabilities/data/export database` on prod,
   where `mariadb-dump --single-transaction` reads it in one transaction,
   and, only once the whole dump arrived, `import database` on the child,
-  which replaces its database with it (devopsy has it up first). Nothing
-  is stopped: the `env` capability sets `SYNC_APP_STOP` and
-  `SYNC_DATABASE_STOP` to `false` then, and the site's files are rsynced
-  as they are, under the running site. Slower for big databases, no
+  which replaces its database with it (devopsy has it up first). The
+  database keeps running on both sides (the `env` capability sets
+  `DATA_DATABASE_STOP` to `never` then), and so does prod's app, its
+  files rsynced as they are; the child's app is down while its database
+  loads (`devopsy.data.stop=import`). Slower for big databases, no
   downtime on prod. The scripts are also the example of a `stream`
   service for your own services.
-- **Exports and imports.** `--export` and `--import` move one labeled
-  service's data the way its label says, outside a sync. With
-  `SYNC_DATABASE=stream` the database's are the same `export` and
+- **Exports and imports.** `--export` and `--import` move one service's
+  data the way its label says, outside a sync. With
+  `DATA_DATABASE=stream` the database's are the same `export` and
   `import` scripts, so `devopsy @prod --export database > dump.sql` is
   the way to get a dump of prod (the site running), and `devopsy
   --import database < dump.sql` loads it locally (with
-  `SYNC_DATABASE=stream` in `.devopsy/.env` too: each side reads its own
+  `DATA_DATABASE=stream` in `.devopsy/.env` too: each side reads its own
   label), or into a child (`devopsy @dev --import database < dump.sql`,
-  which asks for the environment's name).
-  With the default `rsync`, `--export database` is instead a tar of the
-  datadir, the database stopped around it, and `devopsy @prod --export
-  app > files.tar` is always a tar of the site's files.
-- **Sanitized and closed.** After the copy, before `deploy`, the sync
-  capability's `finish` runs on the child (`.devopsy/capabilities/sync/finish`):
+  which asks for the environment's full name, `<project>/dev`). An import
+  stops the app for the load and starts it after; one that fails keeps it
+  down, and nothing runs on the database until an import completes, or
+  `devopsy @dev --import database --resolved` accepts it as it is (an
+  error near the end of a dump, fixed by hand). With the default `mnt`,
+  `--export database` is instead a tar of the datadir, the database and
+  the app stopped around it, and `devopsy @prod --export app > files.tar`
+  is always a tar of the site's files, the site running.
+- **Sanitized and closed.** After the copy, before `deploy`, the data
+  capability's `finish` runs on the child (`.devopsy/capabilities/data/finish`):
   `drush sql:sanitize` scrubs every user's email and password, so no
   production password opens a child and no mail from it reaches anyone
   (`devopsy @dev drush uli` logs you in); if it fails, the app is stopped
@@ -218,7 +223,7 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   unset would be closed again.
 - **Inherited settings.** prod's `inherit:` names variables every child
   gets from prod's server into its own `shared/inherit.env`, on its first
-  release, every sync and `devopsy @dev --inherit`: `SYNC_DATABASE`
+  release, every sync and `devopsy @dev --inherit`: `DATA_DATABASE`
   (above), `DB_PASSWORD` (a raw datadir carries prod's password, a dump
   is imported into a database created with it: the same either way, so
   prod can switch between them under existing children), and
@@ -227,17 +232,17 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   `devopsy @dev --vars set` a value to keep it from following prod,
   `unset` it to follow again.
 - **The labels** in `compose.yaml` tell devopsy what to do with each
-  service during a copy, read on each side from its own release
-  (unlabeled services are left out, and the two sides must agree, hence
-  the inherited `SYNC_DATABASE`; devopsy refuses to copy a datadir under
-  a child's running database). `devopsy.sync` says how the data moves:
-  `rsync` on `app`, `${SYNC_DATABASE:-rsync}` on `database`.
-  `devopsy.sync.stop` says whether the service is stopped on both sides
-  for the whole copy: `${SYNC_APP_STOP:-true}` and
-  `${SYNC_DATABASE_STOP:-true}`, which the `env` capability turns to
-  `false` with `SYNC_DATABASE=stream`. Set either yourself to choose
-  otherwise, but never copy a running datadir: with `rsync` on the
-  database, keep it stopped.
+  service during a copy, read on each side from its own release (the two
+  sides must agree, hence the inherited `DATA_DATABASE`; devopsy refuses
+  to copy a datadir under a child's running database). `devopsy.data`
+  says how the data moves: `mnt` on `app`, `${DATA_DATABASE:-mnt}` on
+  `database`. `devopsy.data.stop` says when it is stopped: `import` on
+  `app` (while any data is imported), `${DATA_DATABASE_STOP:-own}` on
+  `database` (while its own data moves), which the `env` capability
+  turns to `never` with `DATA_DATABASE=stream`; and a service that
+  `depends_on` a stopped one stops with it, the app with the database.
+  Set it yourself to choose otherwise, but never copy a running datadir:
+  with `mnt` on the database, keep it `own`.
 - **Always there: `alwaysup`.** A small Caddy (as 10001, read-only,
   `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule on a router
   at priority 2, below the app's: Traefik sends visitors straight to the
