@@ -90,8 +90,13 @@ the environment (`web/sites/default/settings.php`).
 - **The entrypoint only hashes the basic-auth password and creates
   `public/` and `private/`:** it ran as root before, to chown the mounts
   and drop to `app` with `setpriv`, which also left Docker's default
-  capabilities in the bounding set. It fails with a message when
-  `storage` is not writable (a devopsy without the owner label).
+  capabilities in the bounding set. It fails with a message saying
+  which: `storage` not a mount (missing on the read-only root, or in the
+  container's own filesystem, gone at its next recreate), `public/` or
+  `private/` not a directory, not creatable, or there and not writable
+  by the container's user (a devopsy without the owner label, a copy by
+  hand). Checked, each, on a Docker volume (macOS bind mounts fake
+  ownership).
 - **`drush` is a wrapper for `--root` only:** it went through the
   entrypoint to never run as root from `compose exec`, which now runs
   as the service's user.

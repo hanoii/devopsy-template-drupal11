@@ -25,10 +25,29 @@ if [ "${1:-}" = frankenphp ] && [ -n "${SITE_BASIC_AUTH:-}" ]; then
   echo "entrypoint: basic auth enabled for $SITE_BASIC_AUTH_USER" >&2
 fi
 
-# Public and private files (web/sites/default/files links to public/).
-if ! mkdir -p "$STORAGE_DIR/public" "$STORAGE_DIR/private"; then
-  echo "entrypoint: $STORAGE_DIR is not writable by UID $(id -u): it must be owned by the container's user (devopsy.mnt.owner in compose.yaml, which devopsy applies)" >&2
+# Public and private files (web/sites/default/files links to public/), in
+# the storage mount, created here and writable by this user, or the site
+# would only fail later, on its first upload.
+fix="devopsy.mnt.owner in compose.yaml, which devopsy applies at every release"
+if ! mountpoint -q "$STORAGE_DIR"; then
+  # Missing on a read-only root, or in the container's own filesystem,
+  # gone with it: never what the site's files need.
+  echo "entrypoint: $STORAGE_DIR is not a mount: compose.yaml mounts mnt/storage there" >&2
   exit 1
 fi
+for dir in "$STORAGE_DIR/public" "$STORAGE_DIR/private"; do
+  if [ -e "$dir" ] && [ ! -d "$dir" ]; then
+    echo "entrypoint: $dir is not a directory" >&2
+    exit 1
+  fi
+  if [ ! -d "$dir" ] && ! mkdir "$dir" 2>/dev/null; then
+    echo "entrypoint: cannot create $dir as UID $(id -u): $STORAGE_DIR is owned by $(stat -c %u:%g "$STORAGE_DIR"), and must be the container user's ($fix)" >&2
+    exit 1
+  fi
+  if [ ! -w "$dir" ] || [ ! -x "$dir" ]; then
+    echo "entrypoint: $dir is not writable by UID $(id -u) (owner $(stat -c '%u:%g, mode %a' "$dir")): it must be the container user's ($fix)" >&2
+    exit 1
+  fi
+done
 
 exec "$@"
