@@ -202,7 +202,6 @@ its site, each with its own containers, URL and `shared/.env`.
 devopsy @dev --release           # the first release syncs prod, then runs deploy
 devopsy @pr-12 --release         # one per pull request, the same way
 devopsy @dev --sync             # copy prod again (asks for the name; --yes skips)
-devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the files
 ```
 
 - **The first release syncs.** After the new release goes live and before
