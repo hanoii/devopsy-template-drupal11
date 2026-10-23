@@ -62,7 +62,11 @@ the environment (`web/sites/default/settings.php`).
   (`\.php(/|$)`): unanchored, it refused files like `my.pharmacy.jpg`
   and `report.php.pdf`, and their image style derivatives once written.
   When FrankenPHP's php_server changes, compare `frankenphp adapt` of a
-  bare `php_server` with the route.
+  bare `php_server` with the route. By hand, never a build that diffs
+  the two: it would fail on every FrankenPHP change, and the base floats
+  (below), so a release carrying PHP's security fix would be blocked
+  until the Caddyfile caught up. The comparison is part of updating the
+  base's tag or reviewing a FrankenPHP release.
 - **No symlinks in public files:** the entrypoint removes every one
   under `storage/public` at each start, saying which (`docker/entrypoint`),
   and fails when it cannot. Caddy's file_server follows links and has no
