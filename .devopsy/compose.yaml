@@ -41,6 +41,8 @@ services:
       HEALTHCHECK_PATH: ${HEALTHCHECK_PATH:-/robots.txt}
       # drush's URL (links, drush uli), from capabilities/env/compute.
       DRUSH_OPTIONS_URI: ${DRUSH_OPTIONS_URI:-${SITE_URL:-}}
+      # The largest upload (and request body) PHP takes: docker/php.ini.
+      PHP_UPLOAD_MAX_SIZE: ${PHP_UPLOAD_MAX_SIZE:-32M}
     volumes:
       - ./mnt/storage:/app/storage
       # The access log, in a mount of its own: not part of the site's files.
