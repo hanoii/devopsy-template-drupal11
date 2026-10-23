@@ -113,10 +113,12 @@
 
 		# Never run PHP from sites/: uploaded files (sites/default/files is
 		# the storage mount, the only place the app can write under the web
-		# root) and settings.php. Not anchored at the end and ignoring case,
-		# as PHP's split. A missing file was rewritten to index.php above,
-		# so image style derivatives still reach Drupal.
-		@sites_php path_regexp (?i)^/sites/.*\.ph(p|ar|tml)
+		# root) and settings.php. Exactly what reaches the php handler
+		# below, ignoring case as PHP's split does: a script, or one with
+		# path info. Anything else is a file (my.pharmacy.jpg,
+		# report.php.pdf), served as one. A missing file was rewritten to
+		# index.php above, so image style derivatives still reach Drupal.
+		@sites_php path_regexp (?i)^/sites/.*\.php(/|$)
 		respond @sites_php 403
 
 		@phpFiles path *.php *.php/*

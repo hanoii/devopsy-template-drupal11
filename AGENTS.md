@@ -58,8 +58,11 @@ the environment (`web/sites/default/settings.php`).
   passes the rest as path info, so `evil.php/x`, `evil.php%2Fx` and
   `evil.PHP` ran, and a directory's `index.php` runs from a request
   with no `.php` in it (`files/evil/`). The match ignores case and is
-  not anchored at the end. When FrankenPHP's php_server changes, compare
-  `frankenphp adapt` of a bare `php_server` with the route.
+  exactly what reaches the php handler, a script or one with path info
+  (`\.php(/|$)`): unanchored, it refused files like `my.pharmacy.jpg`
+  and `report.php.pdf`, and their image style derivatives once written.
+  When FrankenPHP's php_server changes, compare `frankenphp adapt` of a
+  bare `php_server` with the route.
 - **Pin MariaDB exactly** (`mariadb:11.8.9`), and bump it on purpose: a
   sync copies the datadir raw between servers, and a server keeps the
   image it pulled first, so a floating tag would let a datadir meet an
@@ -156,11 +159,18 @@ runs (every line 403; from inside the container, past basic auth):
 
 ```sh
 devopsy exec -T app sh -c 'cd storage/public && mkdir -p t && for f in t.php t.PHP t/index.php; do echo "<?php echo 1;" > $f; done'
-for p in t.php t.php/x t.php%2Fx t.PHP t.PHP/x t/ ../files/t.php; do
+for p in t.php t.php/x t.php%2Fx t.PHP t.PHP/x t/ ../files/t.php ./t.php t/../t.php /t.php; do
   devopsy exec -T app curl -s --path-as-is -o /dev/null -w "%{http_code} $p\n" "http://localhost:8080/sites/default/files/$p"
+done
+for u in /sites/default//files/t.php /index.php/../sites/default/files/t.php; do
+  devopsy exec -T app curl -s --path-as-is -o /dev/null -w "%{http_code} $u\n" "http://localhost:8080$u"
 done
 devopsy exec -T app sh -c 'cd storage/public && rm -rf t.php t.PHP t'
 ```
+
+Files whose names only contain `.php` are served (200): `my.pharmacy.jpg`
+and `report.php.pdf` in `storage/public`, and an image style derivative
+of the first, requested twice (the second from the file Drupal wrote).
 
 Then the site: the installer, an image
 upload with an image style, `drush uli`, `drush cr`, `config:export
