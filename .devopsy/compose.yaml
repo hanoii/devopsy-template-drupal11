@@ -105,8 +105,9 @@ services:
     # Floats on the 11.8 LTS series: every release pulls its fixes. devopsy
     # keeps the database going forward only (a rollback leaves it on the
     # newest image its data ran, and a release whose image moved back is
-    # refused) and holds a child on the parent's exact image after a sync,
-    # which copies the datadir raw (older cannot read newer).
+    # refused) and holds a child on the parent's exact image after a sync
+    # that copies the datadir raw (older cannot read newer); a dump
+    # (DATA_DATABASE=stream) loads through the child's own image.
     # MARIADB_AUTO_UPGRADE updates the system tables on start. Never
     # `mariadb:11`: a plain release would cross series. Moving to the next
     # LTS is an edit here, then one `--release --yes` per environment.

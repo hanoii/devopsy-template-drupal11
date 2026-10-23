@@ -228,8 +228,9 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   (older cannot read newer): `compose.yaml` floats it on the 11.8 LTS
   series (`mariadb:11.8`, never `mariadb:11`, which a plain release
   would carry across series), every release pulls its fixes, devopsy
-  keeps the database going forward only, and after a sync the child runs
-  the parent's exact image. Moving to the next series is an edit there
+  keeps the database going forward only, and after a sync that copies
+  the datadir the child runs the parent's exact image (a dump, below,
+  loads through the child's own). Moving to the next series is an edit there
   and one `--release --yes` per environment.
 - **A dump instead:** `DATA_DATABASE=stream` on prod (`devopsy @prod
   --vars set --show DATA_DATABASE stream`; children inherit it, so both
