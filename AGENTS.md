@@ -47,6 +47,19 @@ the environment (`web/sites/default/settings.php`).
   (`php_storage` in settings.php), not to `public://php`, where it would
   outlive releases; an existing site's `storage/public/php` can be
   removed by hand once released.
+- **No PHP ever runs from `sites/`,** however a request writes the path
+  (`docker/Caddyfile`): `sites/default/files` is the storage mount, the
+  one place under the web root the app can write, so a file the app was
+  tricked into writing must never become code. The check sits between
+  php_server's rewrite and its php handler, which is why php_server is
+  written out (FrankenPHP's own expansion, from `frankenphp adapt`):
+  there the path is the script PHP would run. Why not a regex on the
+  request path, as before: PHP splits at `.php` ignoring case and
+  passes the rest as path info, so `evil.php/x`, `evil.php%2Fx` and
+  `evil.PHP` ran, and a directory's `index.php` runs from a request
+  with no `.php` in it (`files/evil/`). The match ignores case and is
+  not anchored at the end. When FrankenPHP's php_server changes, compare
+  `frankenphp adapt` of a bare `php_server` with the route.
 - **Pin MariaDB exactly** (`mariadb:11.8.9`), and bump it on purpose: a
   sync copies the datadir raw between servers, and a server keeps the
   image it pulled first, so a floating tag would let a datadir meet an
@@ -127,7 +140,18 @@ devopsy exec -T app find / -xdev -perm /6000 -type f                       # not
 ```
 
 A chown to oneself succeeds without capabilities, so the `--user 0`
-check chowns to another user. Then the site: the installer, an image
+check chowns to another user. PHP the app writes into its files never
+runs (every line 403; from inside the container, past basic auth):
+
+```sh
+devopsy exec -T app sh -c 'cd storage/public && echo "<?php echo 1;" > t.php && cp t.php t.PHP && mkdir -p t && cp t.php t/index.php'
+for p in t.php t.php/x t.php%2Fx t.PHP t.PHP/x t/ ../files/t.php; do
+  devopsy exec -T app curl -s --path-as-is -o /dev/null -w "%{http_code} $p\n" "http://localhost:8080/sites/default/files/$p"
+done
+devopsy exec -T app sh -c 'cd storage/public && rm -r t.php t.PHP t'
+```
+
+Then the site: the installer, an image
 upload with an image style, `drush uli`, `drush cr`, `config:export
 --destination=/tmp/sync`, and `--export`/`--import database` with
 `DATA_DATABASE=stream` and with the default `mnt`.

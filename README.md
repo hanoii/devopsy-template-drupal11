@@ -83,7 +83,10 @@ configuration, only database updates until then.
   writable paths are `/tmp` (a tmpfs, also Caddy's state), `/app/storage`,
   a bind mount of `.devopsy/mnt/storage` (on servers `shared/mnt/storage`)
   holding public files (`sites/default/files` links there) and private
-  files, and `/app/logs` (`mnt/logs`), the access log.
+  files, and `/app/logs` (`mnt/logs`), the access log. Caddy never runs
+  PHP from `sites/`, however a request writes the path (path info, any
+  case, a directory's `index.php`): what the app writes there is only
+  ever served as a file (`.devopsy/docker/Caddyfile`).
   Compiled Twig (PHP that Drupal includes) lives in `/tmp/php`, never in
   `storage/public/php` (Drupal's default), so it cannot outlive the
   container; `drush cr` clears it. A site installed before can remove
