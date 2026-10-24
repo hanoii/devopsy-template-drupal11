@@ -106,17 +106,19 @@ the environment (`web/sites/default/settings.php`).
   links. Checked as 10001 on a Docker volume: links to a directory, to a
   sibling and dangling ones are replaced, and the start fails when the
   link cannot be removed (storage not the app's).
-- **Pin MariaDB exactly** (`mariadb:11.8.9`), and bump it on purpose: a
-  sync copies the datadir raw between servers, and a server keeps the
-  image it pulled first, so a floating tag would let a datadir meet an
-  older server, which cannot read it (downgrades are unsupported).
-  `MARIADB_AUTO_UPGRADE` updates the system tables when the pin moves
-  up.
-- **Do not pin FrankenPHP:** the base, `dunglas/frankenphp:1-php8.4-trixie`,
-  floats, and devopsy's build mode builds with `--pull`, so each release
-  builds on the tag's current image and PHP's fixes arrive with
-  releases. MariaDB's reason has no PHP equivalent. `--status` prints
-  the PHP the app runs (`capabilities/status/show`).
+- **Float MariaDB on its LTS series** (`mariadb:11.8`, never
+  `mariadb:11`, which a plain release would carry across series): every
+  release pulls its fixes, and devopsy keeps the database going forward
+  only and holds a child on the parent's exact image after a raw
+  datadir sync (older cannot read newer; downgrades are unsupported).
+  `MARIADB_AUTO_UPGRADE` updates the system tables when the image moves
+  up. The next LTS is an edit in `compose.yaml`, then one `--release
+  --accept-image database` per environment.
+- **FrankenPHP floats too:** the base,
+  `dunglas/frankenphp:1-php8.4-trixie`, floats, and devopsy's build mode
+  builds with `--pull`, so each release builds on the tag's current
+  image and PHP's fixes arrive with releases. `--status` prints the PHP
+  the app runs (`capabilities/status/show`).
 
 ## Decisions and gotchas
 

@@ -102,12 +102,17 @@ services:
     networks: [default, traefik]
 
   database:
-    # Pinned exactly: a server keeps the image it pulled first, and a
-    # floating tag would run a different version per server, while a
-    # sync copies the datadir raw from one to another (a downgrade is
-    # unsupported). Bump it here; each server upgrades on its next
-    # release, MARIADB_AUTO_UPGRADE updating the system tables on start.
-    image: mariadb:11.8.9
+    # Floats on the 11.8 LTS series: every release pulls its fixes. devopsy
+    # keeps the database going forward only (a rollback leaves it on the
+    # newest image its data ran, and a release whose image moved back is
+    # refused) and holds a child on the parent's exact image after a sync
+    # that copies the datadir raw (older cannot read newer); a dump
+    # (DATA_DATABASE=stream) loads through the child's own image.
+    # MARIADB_AUTO_UPGRADE updates the system tables on start. Never
+    # `mariadb:11`: a plain release would cross series. Moving to the next
+    # LTS is an edit here, then one `--release --accept-image database`
+    # per environment.
+    image: mariadb:11.8
     restart: unless-stopped
     # As the image's mysql user (999) from the first process, without
     # capabilities: its entrypoint only starts as root to chown the
@@ -179,7 +184,7 @@ services:
   # stop it, and never copy the flag. As APP_UID, read-only;
   # Caddy's directories are tmpfs, nothing is persisted.
   alwaysup:
-    image: caddy:2.11.7-alpine
+    image: caddy:2-alpine
     restart: unless-stopped
     user: ${APP_UID:-10001}:${APP_UID:-10001}
     read_only: true

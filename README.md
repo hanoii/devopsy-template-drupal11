@@ -166,11 +166,10 @@ configuration, only database updates until then.
   reach an environment at its next release, and nothing before. After a
   PHP advisory, release each environment (`devopsy @prod --release`, and
   its children) and check `devopsy @prod --status`, which says the PHP
-  the app runs. MariaDB is pinned instead ("Child environments": a raw
-  datadir must never meet an older server). Requests are kept small for
-  PHP's parser (`.devopsy/docker/php.ini`): uploads up to
-  `PHP_UPLOAD_MAX_SIZE`, 32M by default (per target in `.env`), no upload
-  progress, nesting up to 32. `.devopsy/docker/Caddyfile` has
+  the app runs. MariaDB floats on its series too ("Child environments").
+  Requests are kept small for PHP's parser (`.devopsy/docker/php.ini`):
+  uploads up to `PHP_UPLOAD_MAX_SIZE`, 32M by default (per target in
+  `.env`), no upload progress, nesting up to 32. `.devopsy/docker/Caddyfile` has
   `disable_functions` for web requests ready, commented out: it blocks
   the shell behind most exploits and breaks modules that shell out.
 
@@ -189,7 +188,9 @@ devopsy exec -T app sh -c 'cd /tmp/sync && tar c .' | tar x -C config/sync
 
 `devopsy @prod --rollback` switches to the previous release, with the
 image it ran (devopsy keeps each release's image: nothing is rebuilt), and
-runs `secrets` and `deploy` there. Database updates are not undone.
+runs `secrets` and `deploy` there. Database updates are not undone, and
+the database image never goes back: it stays on the newest image its
+data ran.
 
 ## Child environments
 
@@ -200,7 +201,6 @@ its site, each with its own containers, URL and `shared/.env`.
 devopsy @dev --release           # the first release syncs prod, then runs deploy
 devopsy @pr-12 --release         # one per pull request, the same way
 devopsy @dev --sync             # copy prod again (asks for the name; --yes skips)
-devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the files
 ```
 
 - **The first release syncs.** After the new release goes live and before
@@ -222,9 +222,14 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   on `alwaysup` meanwhile (below). The datadir carries prod's users and
   password hashes, and the image's root password is random, so children
   use prod's `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the
-  child's own. A raw copy needs the same MariaDB on both sides (older
-  cannot read newer), so `compose.yaml` pins the exact version: bump it
-  there, and each environment upgrades at its next release.
+  child's own. A raw copy needs a MariaDB no older than the data
+  (older cannot read newer): `compose.yaml` floats it on the 11.8 LTS
+  series (`mariadb:11.8`, never `mariadb:11`, which a plain release
+  would carry across series), every release pulls its fixes, devopsy
+  keeps the database going forward only, and after a sync that copies
+  the datadir the child runs the parent's exact image (a dump, below,
+  loads through the child's own). Moving to the next series is an edit there
+  and one `--release --accept-image database` per environment.
 - **A dump instead:** `DATA_DATABASE=stream` on prod (`devopsy @prod
   --vars set --show DATA_DATABASE stream`; children inherit it, so both
   sides agree) streams the database instead of copying its datadir:

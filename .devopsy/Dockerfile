@@ -63,9 +63,10 @@ RUN rm -rf web/sites/default/files \
 ########################################
 FROM base AS app
 
-# Not root, and not 1000: that is the devopsy deploy user on servers. The
-# user only names the UID (and gives it /tmp as home): compose.yaml runs the
-# container as ${APP_UID:-10001} and passes the same value here.
+# Not root, and not 1000: that is the devopsy deploy user on servers, in the
+# docker group, so an escape would land as root-equivalent. The user only
+# names the UID (and gives it /tmp as home): compose.yaml runs the container
+# as ${APP_UID:-10001} and passes the same value here.
 ARG APP_UID=10001
 
 # The root filesystem is read-only at runtime: Caddy keeps its data and config
