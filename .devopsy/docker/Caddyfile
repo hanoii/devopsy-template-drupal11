@@ -27,7 +27,18 @@
 		include http.log.access
 	}
 
-	frankenphp
+	frankenphp {
+		# PHP's functions that run a program, disabled for web requests:
+		# uncomment to block the shell behind most exploit chains and
+		# webshells (code running as the app could still do anything PHP
+		# itself can). It breaks what shells out during a request, like
+		# ImageMagick's toolkit through exec, or a module running git or
+		# a converter: try the site's uploads and image styles after
+		# turning it on. Here, not in php.ini: FrankenPHP's php_ini
+		# applies to the web server only, while php.ini also reaches
+		# drush, which needs proc_open.
+		# php_ini disable_functions exec,shell_exec,system,passthru,proc_open,popen
+	}
 }
 
 :8080 {
@@ -63,20 +74,73 @@
 		{$SITE_BASIC_AUTH_USER:admin} {$SITE_BASIC_AUTH_HASH:$2a$10$kMUNBF5FnoGFGaDNESttce7OOf9mPSS/6Bh34E.DC47g3Yh9gpeNe}
 	}
 
-	# Same as Drupal's .htaccess rules: no hidden paths at any level, except .well-known.
-	@dotfiles {
-		path_regexp /\.
-		not path /.well-known/*
+	# What is refused or served, in this order: a route keeps it, where
+	# Caddy would sort respond after route. PHP is php_server written out,
+	# as FrankenPHP 1.13 expands it (`frankenphp adapt`), with one step of
+	# ours between its rewrite and its php handler: there the path is the
+	# script PHP would run, however the request wrote it, with path info
+	# (evil.php/x, evil.php%2Fx), in any case (PHP splits at .php ignoring
+	# it), with dot segments or doubled slashes, or as a directory whose
+	# index.php the rewrite picks (no .php in the request at all). A regex
+	# on the request path missed some of those.
+	route {
+		# Same as Drupal's .htaccess rules: no hidden paths at any level, except .well-known.
+		@dotfiles {
+			path_regexp /\.
+			not path /.well-known/*
+		}
+		respond @dotfiles 403
+
+		# Code, config and backup files that must never be served.
+		@sensitive path_regexp \.(engine|inc|install|make|module|profile|po|sh|.*sql|theme|twig|tpl(\.php)?|xtmpl|yml)(~|\.sw[op]|\.bak|\.orig|\.save)?$|^/(Entries.*|Repository|Root|Tag|Template|composer\.(json|lock)|web\.config)$|^/#.*#$|\.php(~|\.sw[op]|\.bak|\.orig|\.save)$
+		respond @sensitive 403
+
+		# A directory with an index.php gets its trailing slash.
+		@canonicalPath {
+			file {path}/index.php
+			not path */
+		}
+		redir @canonicalPath {http.request.orig_uri.path}/ 308
+
+		# The file asked for (up to its .php, the rest is path info), a
+		# directory's index.php, else Drupal's index.php.
+		@indexFiles file {
+			try_files {path} {path}/index.php index.php
+			try_policy first_exist_fallback
+			split_path .php
+		}
+		rewrite @indexFiles {file_match.relative}{file_match.remainder}
+
+		# Never run PHP from sites/: uploaded files (sites/default/files is
+		# the storage mount, the only place the app can write under the web
+		# root) and settings.php. Exactly what reaches the php handler
+		# below, ignoring case as PHP's split does: a script, or one with
+		# path info. Anything else is a file (my.pharmacy.jpg,
+		# report.php.pdf), served as one. A missing file was rewritten to
+		# index.php above, so image style derivatives still reach Drupal.
+		@sites_php path_regexp (?i)^/sites/.*\.php(/|$)
+		respond @sites_php 403
+
+		# Only Drupal's entry scripts run, as web/.htaccess allows: those at
+		# the web root (index.php, update.php) but the autoloaders, and
+		# those directly in core/ (install.php, rebuild.php, authorize.php),
+		# with no path info there. Never another script under the web root:
+		# code in modules, themes, libraries and core's tests is reachable
+		# by URL and never meant to run alone. .htaccess's RewriteRule
+		# "^(.+/.*|autoload)\.php($|/)" - [F], on the script as above
+		# (with its path info), ignoring case as PHP's split does, and
+		# autoload_runtime.php too, a scaffold file the rule predates (run
+		# alone, it fails with a 500); its exception, /core/[^/]*\.php$, as
+		# Drupal writes it. Not its test front controllers (core's tests do
+		# not run here).
+		@other_php {
+			path_regexp (?i)^/(.+/.*|autoload|autoload_runtime)\.php(/|$)
+			not path_regexp ^/core/[^/]*\.php$
+		}
+		respond @other_php 403
+
+		@phpFiles path *.php *.php/*
+		php @phpFiles
+		file_server
 	}
-	respond @dotfiles 403
-
-	# Code, config and backup files that must never be served.
-	@sensitive path_regexp \.(engine|inc|install|make|module|profile|po|sh|.*sql|theme|twig|tpl(\.php)?|xtmpl|yml)(~|\.sw[op]|\.bak|\.orig|\.save)?$|^/(Entries.*|Repository|Root|Tag|Template|composer\.(json|lock)|web\.config)$|^/#.*#$|\.php(~|\.sw[op]|\.bak|\.orig|\.save)$
-	respond @sensitive 403
-
-	# Never run PHP from sites/ (uploaded files, settings.php).
-	@sites_php path_regexp ^/sites/.*\.(php|phar|phtml)$
-	respond @sites_php 403
-
-	php_server
 }

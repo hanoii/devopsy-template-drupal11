@@ -8,9 +8,20 @@ services:
     build:
       context: ..
       dockerfile: .devopsy/Dockerfile
+      args:
+        APP_UID: ${APP_UID:-10001}
     restart: unless-stopped
-    # The entrypoint starts as root to own the storage mount, then drops to the
-    # app user (UID 10001, set in the Dockerfile).
+    # No privilege at all, from the first process: its own UID (APP_UID,
+    # never root, never 1000, the deploy user on servers), no capabilities
+    # (it listens on 8080; the Dockerfile removes FrankenPHP's file
+    # capability and every setuid binary) and none to gain. `compose exec`
+    # runs as this user too, and as --user 0 is a root without
+    # capabilities. devopsy gives the mounts to it (devopsy.mnt.owner).
+    user: ${APP_UID:-10001}:${APP_UID:-10001}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
     read_only: true
     # The only writable paths: /tmp (also Caddy's data, see the Dockerfile)
     # and the storage and logs mounts.
@@ -30,6 +41,8 @@ services:
       HEALTHCHECK_PATH: ${HEALTHCHECK_PATH:-/robots.txt}
       # drush's URL (links, drush uli), from capabilities/env/compute.
       DRUSH_OPTIONS_URI: ${DRUSH_OPTIONS_URI:-${SITE_URL:-}}
+      # The largest upload (and request body) PHP takes: docker/php.ini.
+      PHP_UPLOAD_MAX_SIZE: ${PHP_UPLOAD_MAX_SIZE:-32M}
     volumes:
       - ./mnt/storage:/app/storage
       # The access log, in a mount of its own: not part of the site's files.
@@ -45,10 +58,13 @@ services:
       start_period: 30s
       start_interval: 1s
     labels:
-      # devopsy --shell: bash here by default, as the app user (compose exec
-      # skips the entrypoint, which drops from root to it).
+      # devopsy --shell: bash here by default, as the service's user.
       - devopsy.shell=true
-      - devopsy.shell.user=app
+      # devopsy creates the mounts' entries (storage, logs) and gives them
+      # to the app's user at every release, whatever owner their files
+      # arrived with (a sync, an import, a copy by hand). Keep it in step
+      # with user: above.
+      - devopsy.mnt.owner=${APP_UID:-10001}:${APP_UID:-10001}
       # Each release gets the server's wildcard domain from its proxy
       # (devopsy-template-traefik exports it), for <project>-<environment>.<domain>. Without a
       # proxy running the release fails: the project expects one.
@@ -93,8 +109,22 @@ services:
     # release, MARIADB_AUTO_UPGRADE updating the system tables on start.
     image: mariadb:11.8.9
     restart: unless-stopped
-    # The official image starts as root to own its data directory, then runs
-    # as its own mysql user (999).
+    # As the image's mysql user (999) from the first process, without
+    # capabilities: its entrypoint only starts as root to chown the
+    # datadir, which devopsy does instead (devopsy.mnt.owner below), and
+    # skips that when started as its user.
+    user: "999:999"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
+    read_only: true
+    # The only writable paths: the datadir (below), /run/mysqld (its
+    # socket and pid file, the mysql user's: a tmpfs is root's unless told
+    # otherwise) and /tmp.
+    tmpfs:
+      - /run/mysqld:uid=999,gid=999,mode=755
+      - /tmp
     environment:
       MARIADB_DATABASE: drupal
       MARIADB_USER: drupal
@@ -132,6 +162,8 @@ services:
       # (DATA_DATABASE=none) leaves the database out of every copy.
       - devopsy.data=${DATA_DATABASE:-mnt}
       - devopsy.data.stop=${DATA_DATABASE_STOP:-own}
+      # The datadir is the mysql user's, created and kept so by devopsy.
+      - devopsy.mnt.owner=999:999
 
   # alwaysup answers for the app while its router is gone: stopped for a
   # sync or a deploy, recreating, unhealthy. Caddy tries the app every
@@ -144,12 +176,12 @@ services:
   # requests here while the app's router is gone: no middleman otherwise,
   # and nothing needed from the server's Traefik. No devopsy.data label,
   # and no depends_on on the app (it would stop with it): copies never
-  # stop it, and never copy the flag. As 10001, read-only;
+  # stop it, and never copy the flag. As APP_UID, read-only;
   # Caddy's directories are tmpfs, nothing is persisted.
   alwaysup:
     image: caddy:2.11.7-alpine
     restart: unless-stopped
-    user: "10001:10001"
+    user: ${APP_UID:-10001}:${APP_UID:-10001}
     read_only: true
     # A tmpfs takes the mode of the directory it covers: /tmp is world
     # writable in the image, /data and /config are root's, so Caddy's
@@ -201,7 +233,8 @@ services:
   goaccess:
     profiles: [tools]
     image: allinurl/goaccess:1.12
-    user: "10001:10001"
+    # The access log's owner: the files are mode 600.
+    user: ${APP_UID:-10001}:${APP_UID:-10001}
     # Docker's own TERM for a terminal is xterm, 8 colors, where GoAccess
     # draws its time columns in black: unreadable on a dark background.
     # With 256 colors it uses a palette that shows on any.
@@ -227,6 +260,7 @@ services:
   jq:
     profiles: [tools]
     image: ghcr.io/jqlang/jq:1.8.1
+    user: ${APP_UID:-10001}:${APP_UID:-10001}
     network_mode: none
     read_only: true
     cap_drop:

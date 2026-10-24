@@ -187,18 +187,21 @@ requests() {
 # jq prints the Showing line and the header itself, so they come after what
 # devopsy and compose say, right above the requests. Lines that are not
 # access log entries (Caddy's and PHP's own messages) are skipped: fromjson?
-# and the logger's name.
+# and the logger's name. Every field is printed without control characters:
+# the app writes the log, and a request can carry any byte in its URL, so
+# an escape sequence would otherwise reach the operator's terminal.
 # shellcheck disable=SC2016
 requests |
   devopsy run --rm --no-deps -T --quiet-pull -e ACCESSLOG_STATIC jq -n -R -r --unbuffered \
     --arg showing "$showing." --arg status "$status" --arg path "$path" \
     --argjson dynamic "$dynamic" --argjson drupal "$drupal" --argjson html "$html" --argjson min "$min" \
     --argjson width "$width" --argjson history "$history" '
+    def clean: tostring | explode | map(select(. >= 32 and (. < 127 or . > 159))) | implode;
     def left(n): tostring as $s | $s + ((" " * (n - ($s | length))) // "");
     def right(n): tostring as $s | ((" " * (n - ($s | length))) // "") + $s;
     def cut: if $width > 0 and length > $width then .[0:$width - 3] + "..." else . end;
     def seconds: "\(. / 1000 | floor).\(. % 1000 | tostring | "000"[length:] + .)";
-    def row: [(.[0] | left(19)), (.[1] | left(6)), (.[2] | right(8)), (.[3] | left(15)), (.[4] | left(6)), .[5]] | join("  ");
+    def row: map(clean) | [(.[0] | left(19)), (.[1] | left(6)), (.[2] | right(8)), (.[3] | left(15)), (.[4] | left(6)), .[5]] | join("  ");
     $showing,
     (["DATE", "STATUS", "SECONDS", "VISITOR", "METHOD", "URL"] | row),
     ((if $history then (input | fromjson) else {from: 0, to: 9999999999} end) as $times
@@ -214,6 +217,6 @@ requests |
      | select($status == "" or (.status | tostring | startswith($status)))
      | select($path == "" or (.request.uri | test($path)))
      | [(.ts | strftime("%Y-%m-%d %H:%M:%S")), .status, ($ms | seconds),
-        .request.client_ip, .request.method, (.request.uri | cut)]
+        .request.client_ip, .request.method, (.request.uri | clean | cut)]
      | row)
   '

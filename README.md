@@ -67,26 +67,59 @@ configuration, only database updates until then.
   their own layers before the code, so most releases only rebuild the code
   layer (well under 1 MB here).
 - **The image** (`.devopsy/Dockerfile`): FrankenPHP (Caddy and PHP 8.4). Code
-  is owned by root and readable only; the app runs as `app`, UID 10001, never
-  root and never 1000, the deploy user on devopsy servers. The UID is fixed in
-  the image, not passed around as a setting.
-- **Read-only.** The container's root filesystem is read-only. The only
+  is owned by root and readable only. It has no setuid or setgid binaries
+  and no file capabilities (FrankenPHP's, for ports below 1024, is
+  removed: the app listens on 8080).
+- **No privilege.** Every container runs as a user of its own from its
+  first process, never root: the app (and alwaysup and the tools) as
+  `APP_UID`, 10001 by default (never 1000, the deploy user on devopsy
+  servers), MariaDB as its image's user, 999. Each drops every
+  capability and sets `no-new-privileges` (alwaysup keeps the one its
+  upstream Caddy binary needs to start), so a compromised app finds no
+  way up: `devopsy @prod --shell app --user root` is a root without
+  capabilities, which cannot read the app's mode-600 files, chown
+  anything or install packages. Never run drush as root: it leaves
+  root's files in `/tmp/php` and storage that the app cannot replace.
+  `devopsy @prod drush`, `exec` and `--shell` run as the app by default.
+- **Read-only.** Every container's root filesystem is read-only
+  (MariaDB writes its datadir, and its socket in a tmpfs). The app's only
   writable paths are `/tmp` (a tmpfs, also Caddy's state), `/app/storage`,
   a bind mount of `.devopsy/mnt/storage` (on servers `shared/mnt/storage`)
   holding public files (`sites/default/files` links there) and private
-  files, and `/app/logs` (`mnt/logs`), the access log.
+  files, and `/app/logs` (`mnt/logs`), the access log. Caddy never runs
+  PHP from `sites/`, however a request writes the path (path info, any
+  case, a directory's `index.php`): what the app writes there is only
+  ever served as a file (`.devopsy/docker/Caddyfile`). Nor does it run
+  any other script than Drupal's entry points, as Drupal's own
+  `web/.htaccess` allows: `index.php` and `update.php` at the web root
+  and the scripts directly in `core/` (`install.php`, `rebuild.php`,
+  `authorize.php`); `autoload.php` and any PHP in modules, themes,
+  libraries or core's tests is refused (403). Nor a link: Caddy
+  follows symlinks, so one written into public files would serve its
+  target (private files, the access log) to anyone, across releases.
+  Drupal never creates them, and the app removes any under
+  `storage/public` at every start, saying so in its log, and
+  `storage/public` and `storage/private` themselves when they are links,
+  making them directories again.
+  Compiled Twig (PHP that Drupal includes) lives in `/tmp/php`, never in
+  `storage/public/php` (Drupal's default), so it cannot outlive the
+  container; `drush cr` clears it. A site installed before can remove
+  `storage/public/php` by hand once released.
 - **Destroying.** `devopsy @prod --destroy` is devopsy's alone: it takes
   the containers, volumes and the built image down, empties `mnt/` as root
   (its files belong to `app` and MariaDB's user), then removes the
   environment's directory. No destroy step.
-- **Ownership.** `shared/mnt` belongs to the deploy user, so the entrypoint
-  starts as root, gives `/app/storage` and `/app/logs` to `app`, and drops
-  to `app` with `setpriv`. `drush` in the image is a wrapper that does the
-  same, so `devopsy exec app drush` never runs as root. `devopsy --shell`
-  opens bash as `app` too: `compose exec` skips the entrypoint, so the
-  `app` service's labels say so (`devopsy.shell=true`,
-  `devopsy.shell.user=app`). `devopsy --shell app --user root` for root,
-  `devopsy --shell database` for another service.
+- **Ownership.** devopsy owns the mounts: `devopsy.mnt.owner` on a
+  service (`compose.yaml`) makes it create that service's entries of
+  `mnt` and give them to the service's user at every release, whatever
+  owner their files arrived with (a sync, an import, a copy by hand):
+  `storage` and `logs` to `APP_UID`, `database` to 999. So nothing starts
+  as root to chown, and this needs a devopsy with that label: an older
+  one leaves a new environment's entries as Docker creates them, root's,
+  and the app refuses to start, saying so. `drush`, `compose exec` and
+  `devopsy --shell` (bash, the `app` service's `devopsy.shell` label) run
+  as the service's user too; `devopsy --shell database` for another
+  service.
 - **Settings** (`web/sites/default/settings.php`) come from the environment
   set in `compose.yaml`: database, hash salt, any host (Traefik only routes
   the environment's own), and Traefik as the reverse proxy for client IPs
@@ -127,6 +160,19 @@ configuration, only database updates until then.
   `.env`, and both follow.
 - **Code changes need a release.** OPcache never revalidates (the code cannot
   change), and modules are added with composer, then released.
+- **PHP updates come with releases.** The image builds on FrankenPHP's
+  floating `1-php8.4-trixie` tag, and devopsy builds with `--pull`, so
+  every release builds on that tag's current image: PHP's security fixes
+  reach an environment at its next release, and nothing before. After a
+  PHP advisory, release each environment (`devopsy @prod --release`, and
+  its children) and check `devopsy @prod --status`, which says the PHP
+  the app runs. MariaDB is pinned instead ("Child environments": a raw
+  datadir must never meet an older server). Requests are kept small for
+  PHP's parser (`.devopsy/docker/php.ini`): uploads up to
+  `PHP_UPLOAD_MAX_SIZE`, 32M by default (per target in `.env`), no upload
+  progress, nesting up to 32. `.devopsy/docker/Caddyfile` has
+  `disable_functions` for web requests ready, commented out: it blocks
+  the shell behind most exploits and breaks modules that shell out.
 
 ## Changing configuration
 
@@ -243,7 +289,7 @@ devopsy @dev --sync -- --exclude=css   # arguments after -- go to rsync, for the
   `depends_on` a stopped one stops with it, the app with the database.
   Set it yourself to choose otherwise, but never copy a running datadir:
   with `mnt` on the database, keep it `own`.
-- **Always there: `alwaysup`.** A small Caddy (as 10001, read-only,
+- **Always there: `alwaysup`.** A small Caddy (as `APP_UID`, read-only,
   `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule on a router
   at priority 2, below the app's: Traefik sends visitors straight to the
   app while its container runs, and to `alwaysup` only while the app's
