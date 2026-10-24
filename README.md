@@ -93,7 +93,9 @@ configuration, only database updates until then.
   follows symlinks, so one written into public files would serve its
   target (private files, the access log) to anyone, across releases.
   Drupal never creates them, and the app removes any under
-  `storage/public` at every start, saying so in its log.
+  `storage/public` at every start, saying so in its log, and
+  `storage/public` and `storage/private` themselves when they are links,
+  making them directories again.
   Compiled Twig (PHP that Drupal includes) lives in `/tmp/php`, never in
   `storage/public/php` (Drupal's default), so it cannot outlive the
   container; `drush cr` clears it. A site installed before can remove
