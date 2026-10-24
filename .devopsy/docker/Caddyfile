@@ -121,6 +121,24 @@
 		@sites_php path_regexp (?i)^/sites/.*\.php(/|$)
 		respond @sites_php 403
 
+		# Only Drupal's entry scripts run, as web/.htaccess allows: those at
+		# the web root (index.php, update.php) but the autoloaders, and
+		# those directly in core/ (install.php, rebuild.php, authorize.php),
+		# with no path info there. Never another script under the web root:
+		# code in modules, themes, libraries and core's tests is reachable
+		# by URL and never meant to run alone. .htaccess's RewriteRule
+		# "^(.+/.*|autoload)\.php($|/)" - [F], on the script as above
+		# (with its path info), ignoring case as PHP's split does, and
+		# autoload_runtime.php too, a scaffold file the rule predates (run
+		# alone, it fails with a 500); its exception, /core/[^/]*\.php$, as
+		# Drupal writes it. Not its test front controllers (core's tests do
+		# not run here).
+		@other_php {
+			path_regexp (?i)^/(.+/.*|autoload|autoload_runtime)\.php(/|$)
+			not path_regexp ^/core/[^/]*\.php$
+		}
+		respond @other_php 403
+
 		@phpFiles path *.php *.php/*
 		php @phpFiles
 		file_server
