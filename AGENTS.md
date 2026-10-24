@@ -77,6 +77,13 @@ the environment (`web/sites/default/settings.php`).
   releases. Drupal never creates one there. Demonstrated: private files
   and the access log served through such links, gone after a restart.
   Between its creation and the next start a link is served (accepted).
+  `public/` and `private/` themselves, when links (`private -> public`
+  would put private files where anyone fetches them, `public ->
+  /app/logs` serve the log), are removed, said, and made again as
+  directories, before anything tests them: `-e`, `-d` and `-w` follow
+  links. Checked as 10001 on a Docker volume: links to a directory, to a
+  sibling and dangling ones are replaced, and the start fails when the
+  link cannot be removed (storage not the app's).
 - **Pin MariaDB exactly** (`mariadb:11.8.9`), and bump it on purpose: a
   sync copies the datadir raw between servers, and a server keeps the
   image it pulled first, so a floating tag would let a datadir meet an
@@ -105,8 +112,8 @@ the environment (`web/sites/default/settings.php`).
   whose binary carries the same capability: hence its `cap_add:
   [NET_BIND_SERVICE]`.
 - **The entrypoint only hashes the basic-auth password, removes
-  symlinks from public files (above) and creates `public/` and
-  `private/`:** it ran as root before, to chown the mounts
+  symlinks from public files and in place of `public/` and `private/`
+  (above) and creates `public/` and `private/`:** it ran as root before, to chown the mounts
   and drop to `app` with `setpriv`, which also left Docker's default
   capabilities in the bounding set. It fails with a message saying
   which: `storage` not a mount (missing on the read-only root, or in the
