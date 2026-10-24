@@ -67,6 +67,28 @@ the environment (`web/sites/default/settings.php`).
   (below), so a release carrying PHP's security fix would be blocked
   until the Caddyfile caught up. The comparison is part of updating the
   base's tag or reviewing a FrankenPHP release.
+- **Only Drupal's entry scripts run** (`docker/Caddyfile`, `@other_php`,
+  beside the `sites/` rule): `index.php` and `update.php` at the web
+  root, and the scripts directly in `core/` without path info
+  (`install.php`, `rebuild.php`, `authorize.php`). Source: Drupal's
+  `web/.htaccess`, `RewriteRule "^(.+/.*|autoload)\.php($|/)" - [F]`
+  with its exception `RewriteCond %{REQUEST_URI} !/core/[^/]*\.php$`,
+  matched on the script php_server would run (with its path info, as the
+  `sites/` rule), ignoring case as PHP's split does; the exception as
+  Drupal writes it. Plus `autoload_runtime.php`, a scaffold file newer
+  than the rule, which run alone only fails (a 500). Not the test front
+  controllers `.htaccess` also lets through (`core/modules/system/tests/`,
+  for core's own test runs). Why: code in modules, themes, libraries
+  and core's tests is reachable by URL and never meant to run alone
+  (a contrib module's vendor-like script, a fixture that fails half
+  way); Drupal's own Apache setup refuses it, and php_server ran any of
+  it (checked: a module's `evil.php`, `vendor/autoload.php`
+  and a directory's `index.php` ran, and core's fixtures answered 500).
+  Checked against the built image run as compose runs it (10001, no
+  capabilities, read-only, Drupal installed): the front page,
+  `/index.php/...`, `/update.php` (logged in), `core/install.php`,
+  `rebuild.php` and `authorize.php`, static files and image style
+  derivatives reach what they did; everything above is a 403.
 - **No symlinks in public files:** the entrypoint removes every one
   under `storage/public` at each start, saying which (`docker/entrypoint`),
   and fails when it cannot. Caddy's file_server follows links and has no
@@ -196,6 +218,17 @@ for u in /sites/default//files/t.php /index.php/../sites/default/files/t.php; do
   devopsy exec -T app curl -s --path-as-is -o /dev/null -w "%{http_code} $u\n" "http://localhost:8080$u"
 done
 devopsy exec -T app sh -c 'cd storage/public && rm -rf t.php t.PHP t'
+```
+
+Only Drupal's entry scripts run (the first five reach PHP, a 200, a
+302 or Drupal's own 403 with a page; the rest are an empty 403):
+
+```sh
+for u in / /index.php/user/login /core/install.php /core/rebuild.php /core/authorize.php \
+  /core/install.php/x /autoload.php /autoload_runtime.php /core/lib/Drupal.php \
+  /core/modules/contact/tests/drupal-7.contact.database.php /core/modules/system/tests/http.php; do
+  devopsy exec -T app curl -s -o /dev/null -w "%{http_code} %{size_download} $u\n" "http://localhost:8080$u"
+done
 ```
 
 Files whose names only contain `.php` are served (200): `my.pharmacy.jpg`

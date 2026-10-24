@@ -89,7 +89,12 @@ configuration, only database updates until then.
   files, and `/app/logs` (`mnt/logs`), the access log. Caddy never runs
   PHP from `sites/`, however a request writes the path (path info, any
   case, a directory's `index.php`): what the app writes there is only
-  ever served as a file (`.devopsy/docker/Caddyfile`). Nor a link: Caddy
+  ever served as a file (`.devopsy/docker/Caddyfile`). Nor does it run
+  any other script than Drupal's entry points, as Drupal's own
+  `web/.htaccess` allows: `index.php` and `update.php` at the web root
+  and the scripts directly in `core/` (`install.php`, `rebuild.php`,
+  `authorize.php`); `autoload.php` and any PHP in modules, themes,
+  libraries or core's tests is refused (403). Nor a link: Caddy
   follows symlinks, so one written into public files would serve its
   target (private files, the access log) to anyone, across releases.
   Drupal never creates them, and the app removes any under
