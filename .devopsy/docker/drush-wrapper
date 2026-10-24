@@ -1,5 +1,5 @@
 #!/bin/sh
-# drush wrapper: goes through the entrypoint so it always runs as the app
-# user, even from `docker compose exec`, which runs as root. Its URL is
+# drush with the site's root, as whatever user runs it: the container's
+# (compose.yaml's user:, also what `compose exec` runs as). Its URL is
 # DRUSH_OPTIONS_URI, the environment's (compose.yaml).
-exec entrypoint /app/vendor/bin/drush --root=/app/web "$@"
+exec /app/vendor/bin/drush --root=/app/web "$@"

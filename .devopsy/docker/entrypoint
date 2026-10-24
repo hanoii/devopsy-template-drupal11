@@ -1,12 +1,8 @@
 #!/bin/sh
-# Container entrypoint.
-#
-# Starts as root to prepare the storage and logs mounts, then drops
-# privileges to the app user with setpriv. On servers the mount is created by
-# devopsy's deploy user, so the first start chowns it; the recursive chown runs
-# only when the content does not belong to the app user yet.
-#
-# When not started as root (docker run --user, etc.) it only runs the command.
+# Container entrypoint. It runs as whatever user the container runs as
+# (compose.yaml's user:, APP_UID), never needing root or a capability:
+# devopsy gives the storage and logs mounts to that user before the
+# release starts it (compose.yaml's devopsy.mnt.owner).
 set -eu
 
 STORAGE_DIR="${STORAGE_DIR:-/app/storage}"
@@ -29,22 +25,55 @@ if [ "${1:-}" = frankenphp ] && [ -n "${SITE_BASIC_AUTH:-}" ]; then
   echo "entrypoint: basic auth enabled for $SITE_BASIC_AUTH_USER" >&2
 fi
 
-if [ "$(id -u)" != "0" ]; then
-  exec "$@"
+# Public and private files (web/sites/default/files links to public/), in
+# the storage mount, created here and writable by this user, or the site
+# would only fail later, on its first upload.
+fix="devopsy.mnt.owner in compose.yaml, which devopsy applies at every release"
+if ! mountpoint -q "$STORAGE_DIR"; then
+  # Missing on a read-only root, or in the container's own filesystem,
+  # gone with it: never what the site's files need.
+  echo "entrypoint: $STORAGE_DIR is not a mount: compose.yaml mounts mnt/storage there" >&2
+  exit 1
 fi
-
-app_uid="$(id -u app)"
-if [ -d "$STORAGE_DIR/public" ] && [ "$(stat -c %u "$STORAGE_DIR/public")" != "$app_uid" ]; then
-  echo "entrypoint: chown -R app $STORAGE_DIR" >&2
-  chown -R app:app "$STORAGE_DIR"
+# public/ and private/ themselves are never links: a link the app was
+# tricked into writing in their place (private -> public, public ->
+# /app/logs) would put private files where anyone can fetch them, or serve
+# what it points to, and -e, -d and -w below would follow it. Removed and
+# made again as directories, each one said; one that cannot be removed
+# fails the start.
+for dir in "$STORAGE_DIR/public" "$STORAGE_DIR/private"; do
+  if [ -L "$dir" ]; then
+    echo "entrypoint: removing the symlink $dir (to $(readlink "$dir")): it must be a directory" >&2
+    rm -f "$dir" || { echo "entrypoint: cannot remove $dir" >&2; exit 1; }
+  fi
+done
+# No symlinks in public files: Caddy's file_server follows them, and has no
+# setting not to, so a link the app was tricked into writing
+# (public/p -> /app/storage/private, /app/logs, /proc/self/environ) would
+# serve its target to anyone, and keep serving it across releases, after
+# the hole is closed. Drupal never creates one there. Removed at every
+# start, each one said; one that cannot be removed fails the start.
+if [ -d "$STORAGE_DIR/public" ]; then
+  find "$STORAGE_DIR/public" -type l -exec sh -c '
+    for link; do
+      echo "entrypoint: removing the symlink $link (to $(readlink "$link")): public files are never links" >&2
+      rm -f "$link" || { echo "entrypoint: cannot remove $link" >&2; exit 1; }
+    done
+  ' sh {} +
 fi
+for dir in "$STORAGE_DIR/public" "$STORAGE_DIR/private"; do
+  if [ -e "$dir" ] && [ ! -d "$dir" ]; then
+    echo "entrypoint: $dir is not a directory" >&2
+    exit 1
+  fi
+  if [ ! -d "$dir" ] && ! mkdir "$dir" 2>/dev/null; then
+    echo "entrypoint: cannot create $dir as UID $(id -u): $STORAGE_DIR is owned by $(stat -c %u:%g "$STORAGE_DIR"), and must be the container user's ($fix)" >&2
+    exit 1
+  fi
+  if [ ! -w "$dir" ] || [ ! -x "$dir" ]; then
+    echo "entrypoint: $dir is not writable by UID $(id -u) (owner $(stat -c '%u:%g, mode %a' "$dir")): it must be the container user's ($fix)" >&2
+    exit 1
+  fi
+done
 
-# Create (or fix the owner of) the mount point and its subdirectories.
-install -d -o app -g app "$STORAGE_DIR" "$STORAGE_DIR/public" "$STORAGE_DIR/private"
-
-# The access log's mount (docker/Caddyfile): docker creates it as root.
-if [ -d /app/logs ]; then
-  chown app:app /app/logs
-fi
-
-exec setpriv --reuid=app --regid=app --init-groups env HOME=/tmp "$@"
+exec "$@"
