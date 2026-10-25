@@ -2,13 +2,13 @@
 # The data capability's import (devopsy-cli's README, "Capabilities"):
 # reads one service's data from stdin, as export writes it, and replaces
 # what the service had. devopsy runs it on the child, in its current
-# release with its environment, for each service labeled
-# devopsy.data=stream when it is synced from its parent, and for
+# release with its environment, for each service copied as
+# devopsy.data.copy=custom when it is synced from its parent, and for
 # --import:
 #   devopsy --import database < dump.sql
 # devopsy only runs it once the whole stream arrived (export exited 0)
 # and has the service up first: nothing here checks or starts either.
-# Only the database is this script's (DATA_DATABASE=stream, compose.yaml),
+# Only the database is this script's (DATA_DATABASE=custom, compose.yaml),
 # loaded into the running database, which needs devopsy.data.stop=never;
 # devopsy stops the app (its import label) meanwhile, and keeps it down
 # if the load fails.
@@ -17,7 +17,7 @@ service=${1:?usage: import <service>}
 
 case " ${DEVOPSY_DATA_STOP:-} " in
   *" $service "*)
-    echo "import: $service is stopped for the copy, and loading a dump needs the database running: devopsy.data.stop=never for a stream (DATA_DATABASE_STOP=never)" >&2
+    echo "import: $service is stopped for the copy, and loading a dump needs the database running: devopsy.data.stop=never for a dump (DATA_DATABASE_STOP=never)" >&2
     exit 1
     ;;
 esac

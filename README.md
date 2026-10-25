@@ -230,8 +230,8 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   the datadir the child runs the parent's exact image (a dump, below,
   loads through the child's own). Moving to the next series is an edit there
   and one `--release --accept-image database` per environment.
-- **A dump instead:** `DATA_DATABASE=stream` on prod (`devopsy @prod
-  --vars set --show DATA_DATABASE stream`; children inherit it, so both
+- **A dump instead:** `DATA_DATABASE=custom` on prod (`devopsy @prod
+  --vars set --show DATA_DATABASE custom`; children inherit it, so both
   sides agree) streams the database instead of copying its datadir:
   devopsy runs `.devopsy/capabilities/data/export database` on prod,
   where `mariadb-dump --single-transaction` reads it in one transaction,
@@ -241,21 +241,21 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   `DATA_DATABASE_STOP` to `never` then), and so does prod's app, its
   files rsynced as they are; the child's app is down while its database
   loads (`devopsy.data.stop=import`). Slower for big databases, no
-  downtime on prod. The scripts are also the example of a `stream`
-  service for your own services.
+  downtime on prod. The scripts are also the example of a
+  `devopsy.data.copy=custom` service for your own services.
 - **Exports and imports.** `--export` and `--import` move one service's
-  data the way its label says, outside a sync. With
-  `DATA_DATABASE=stream` the database's are the same `export` and
+  data the way its copy label says, outside a sync. With
+  `DATA_DATABASE=custom` the database's are the same `export` and
   `import` scripts, so `devopsy @prod --export database > dump.sql` is
   the way to get a dump of prod (the site running), and `devopsy
   --import database < dump.sql` loads it locally (with
-  `DATA_DATABASE=stream` in `.devopsy/.env` too: each side reads its own
+  `DATA_DATABASE=custom` in `.devopsy/.env` too: each side reads its own
   label), or into a child (`devopsy @dev --import database < dump.sql`,
   which asks for the environment's full name, `<project>/dev`). An import
   stops the app for the load and starts it after; one that fails keeps it
   down, and nothing runs on the database until an import completes, or
   `devopsy @dev --import database --resolved` accepts it as it is (an
-  error near the end of a dump, fixed by hand). With the default `mnt`,
+  error near the end of a dump, fixed by hand). With the default `volumes`,
   `--export database` is instead a tar of the datadir, the database and
   the app stopped around it, and `devopsy @prod --export app > files.tar`
   is always a tar of the site's files, the site running.
@@ -285,15 +285,16 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
 - **The labels** in `compose.yaml` tell devopsy what to do with each
   service during a copy, read on each side from its own release (the two
   sides must agree, hence the inherited `DATA_DATABASE`; devopsy refuses
-  to copy a datadir under a child's running database). `devopsy.data`
-  says how the data moves: `mnt` on `app`, `${DATA_DATABASE:-mnt}` on
-  `database`. `devopsy.data.stop` says when it is stopped: `import` on
+  to copy a datadir under a child's running database). `devopsy.data=true`
+  says a service has data, on `app` and `database`; `devopsy.data.copy`
+  says how a copy carries it: the default `volumes` (its entries of
+  `mnt` as files) on `app`, `${DATA_DATABASE:-volumes}` on `database`. `devopsy.data.stop` says when it is stopped: `import` on
   `app` (while any data is imported), `${DATA_DATABASE_STOP:-own}` on
   `database` (while its own data moves), which the `env` capability
-  turns to `never` with `DATA_DATABASE=stream`; and a service that
+  turns to `never` with `DATA_DATABASE=custom`; and a service that
   `depends_on` a stopped one stops with it, the app with the database.
   Set it yourself to choose otherwise, but never copy a running datadir:
-  with `mnt` on the database, keep it `own`.
+  with `volumes` on the database, keep it `own`.
 - **Always there: `alwaysup`.** A small Caddy (as `APP_UID`, read-only,
   `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule on a router
   at priority 2, below the app's: Traefik sends visitors straight to the

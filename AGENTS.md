@@ -165,10 +165,10 @@ the environment (`web/sites/default/settings.php`).
   with tmpfs options (`uid=999,gid=999`; a tmpfs is root's otherwise,
   and Compose's long syntax has no owner). Checked on 11.8.9 with no
   capabilities: a first start on an empty entry, a restart, an upgrade
-  start from 11.4 with `MARIADB_AUTO_UPGRADE`, and the stream export and
+  start from 11.4 with `MARIADB_AUTO_UPGRADE`, and the custom export and
   import; read-only, a first start, a restart and a recreate, the
   healthcheck, `mariadb-dump`, and `--export`/`--import database` with
-  `mnt` and `stream`. Its image
+  `volumes` and `custom` (then `mnt` and `stream`). Its image
   keeps its setuid binaries (not ours to rebuild); without capabilities
   and with `no-new-privileges` they give nothing. Its log warns that
   `io_uring_queue_init()` failed with EPERM: Docker's seccomp profile,
@@ -247,7 +247,7 @@ devopsy restart app && devopsy logs app | grep 'removing the symlink'
 Then the site: the installer, an image
 upload with an image style, `drush uli`, `drush cr`, `config:export
 --destination=/tmp/sync`, and `--export`/`--import database` with
-`DATA_DATABASE=stream` and with the default `mnt`.
+`DATA_DATABASE=custom` and with the default `volumes`.
 
 ## Commits
 

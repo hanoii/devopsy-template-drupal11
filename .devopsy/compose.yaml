@@ -92,7 +92,7 @@ services:
       # stop_grace_period; alwaysup answers meanwhile); its own files are
       # exported while it runs. With the database copied as files (own),
       # it also stops with it on both sides, depending on it.
-      - devopsy.data=mnt
+      - devopsy.data=true
       - devopsy.data.stop=import
       # The access log stays the environment's own: never copied.
       - devopsy.data.exclude=logs
@@ -107,7 +107,7 @@ services:
     # newest image its data ran, and a release whose image moved back is
     # refused) and holds a child on the parent's exact image after a sync
     # that copies the datadir raw (older cannot read newer); a dump
-    # (DATA_DATABASE=stream) loads through the child's own image.
+    # (DATA_DATABASE=custom) loads through the child's own image.
     # MARIADB_AUTO_UPGRADE updates the system tables on start. Never
     # `mariadb:11`: a plain release would cross series. Moving to the next
     # LTS is an edit here, then one `--release --accept-image database`
@@ -150,13 +150,14 @@ services:
       start_period: 60s
       start_interval: 1s
     labels:
-      # Data: DATA_DATABASE (set on prod, inherited by children so both
-      # sides agree). mnt, the default: the datadir raw, with the database
+      # Data: the datadir. How a copy carries it, DATA_DATABASE (set on
+      # prod, inherited by children so both sides agree): volumes, the
+      # default: the datadir raw, with the database
       # stopped while its data moves (own: on both sides of a sync, around
       # its --export and --import), the app with it; consistent, prod down
       # for the copy. Never copy a running datadir: it is not a
       # consistent image. The datadir carries prod's users and passwords,
-      # hence DB_PASSWORD in prod's inherit:. stream:
+      # hence DB_PASSWORD in prod's inherit:. custom:
       # capabilities/data/export dumps the running database and
       # capabilities/data/import loads it (into a child's created with the
       # same, inherited, password); the database stays up
@@ -165,7 +166,8 @@ services:
       # the load. The same scripts serve devopsy @prod --export database >
       # dump.sql and devopsy --import database < dump.sql. none
       # (DATA_DATABASE=none) leaves the database out of every copy.
-      - devopsy.data=${DATA_DATABASE:-mnt}
+      - devopsy.data=true
+      - devopsy.data.copy=${DATA_DATABASE:-volumes}
       - devopsy.data.stop=${DATA_DATABASE_STOP:-own}
       # The datadir is the mysql user's, created and kept so by devopsy.
       - devopsy.mnt.owner=999:999
