@@ -1,11 +1,11 @@
 #!/bin/sh
 # The data capability's export (devopsy-cli's README, "Capabilities"):
 # writes one service's data to stdout. devopsy runs it on the parent, in
-# its current release with its environment, for each service labeled
-# devopsy.data=stream when a child is synced (its first release, or
+# its current release with its environment, for each service copied as
+# devopsy.data.copy=custom when a child is synced (its first release, or
 # devopsy @<child> --sync), and for --export:
 #   devopsy @prod --export database > dump.sql
-# Only the database is this script's, streamed with DATA_DATABASE=stream
+# Only the database is this script's, dumped with DATA_DATABASE=custom
 # (compose.yaml). The dump needs the database running: when devopsy
 # stopped it (in DEVOPSY_DATA_STOP), this refuses.
 set -eu
@@ -13,7 +13,7 @@ service=${1:?usage: export <service>}
 
 case " ${DEVOPSY_DATA_STOP:-} " in
   *" $service "*)
-    echo "export: $service is stopped for the copy, and a dump needs the database running: devopsy.data.stop=never for a stream (DATA_DATABASE_STOP=never)" >&2
+    echo "export: $service is stopped for the copy, and a dump needs the database running: devopsy.data.stop=never for a dump (DATA_DATABASE_STOP=never)" >&2
     exit 1
     ;;
 esac

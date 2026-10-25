@@ -12,12 +12,12 @@
 # is none, and a release without DEVOPSY_DOMAINS has no host at all.
 set -euf
 # Data (compose.yaml's devopsy.data labels): a raw datadir (DATA_DATABASE
-# unset or mnt): nothing printed, the database is stopped while its data
-# moves (own), and the app with it. A dump (stream): the database keeps
+# unset or volumes): nothing printed, the database is stopped while its
+# data moves (own), and the app with it. A dump (custom): the database keeps
 # running (never: the dump and the load need it), the app is down only
 # while data is imported (its import label). devopsy only sets what is
 # unset: set DATA_DATABASE_STOP yourself to choose otherwise.
-if [ "${DATA_DATABASE:-mnt}" = stream ]; then
+if [ "${DATA_DATABASE:-volumes}" = custom ]; then
   echo "DATA_DATABASE_STOP='never'"
 fi
 name=${COMPOSE_PROJECT_NAME:?}

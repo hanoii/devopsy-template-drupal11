@@ -29,7 +29,7 @@ environments:
   # Children: syncd from prod on their first release, before deploy, and
   # again with `devopsy @dev --sync`: files and the database's datadir
   # rsynced by devopsy with both stopped, or the database streamed
-  # (DATA_DATABASE=stream: capabilities/data/export and import) with
+  # (DATA_DATABASE=custom: capabilities/data/export and import) with
   # prod's site running; each keeps its own shared/.env otherwise.
   dev: {parent: prod}
   "pr-*":                         # pull request environments: @pr-123
