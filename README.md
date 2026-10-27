@@ -281,7 +281,8 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   `SITE_BASIC_AUTH`, so copies of a closed site stay closed, with prod's
   login. A child's own `shared/.env` wins over the inherited file:
   `devopsy @dev --vars set` a value to keep it from following prod,
-  `unset` it to follow again.
+  `unset` it to follow again. Never add `PROXY_DOMAINS`: a child would
+  route prod's own hosts beside it.
 - **The labels** in `compose.yaml` tell devopsy what to do with each
   service during a copy, read on each side from its own release (the two
   sides must agree, hence the inherited `DATA_DATABASE`; devopsy refuses
