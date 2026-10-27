@@ -28,4 +28,4 @@ else
   # Nothing to import yet: config:import refuses an empty directory.
   devopsy exec -T app drush updatedb --yes
 fi
-echo "deploy: ${SITE_URL:-no URL: no wildcard domain or DEVOPSY_DOMAINS}" >&2
+echo "deploy: ${SITE_URL:-no URL: no base domain or PROXY_DOMAINS}" >&2

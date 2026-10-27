@@ -4,7 +4,7 @@
 # environment loaded. One fact per line.
 set -eu
 
-echo "url          ${SITE_URL:-no URL: no wildcard domain or DEVOPSY_DOMAINS}"
+echo "url          ${SITE_URL:-no URL: no base domain or PROXY_DOMAINS}"
 # The login in front of the site, in full: this is where to look it up.
 if [ -n "${SITE_BASIC_AUTH:-}" ]; then
   echo "basic auth   $SITE_BASIC_AUTH"
