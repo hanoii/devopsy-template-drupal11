@@ -21,14 +21,14 @@ the environment:
 echo DEVOPSY_SERVER=devopsy@203.0.113.10 >> .devopsy/.env
 ```
 
-Each environment gets a URL, `<project>-<environment>.<server's wildcard
+Each environment gets a URL, `<project>-<environment>.<server's base
 domain>` (its compose project name, like `drupal11-prod`), whose domain each
 release imports from the server's proxy (devopsy-template-traefik), through the
 `devopsy.import` label in `compose.yaml`: a release fails while no proxy
 runs. The release says what it imported; `devopsy @prod --debug imports`
 shows it later, and whether the proxy has changed it since. Override it,
 or set it empty for none, per target: `devopsy @prod --vars set --show
-DEVOPSY_WILDCARD_DOMAIN`.
+PROXY_BASE_DOMAIN`.
 
 ```sh
 devopsy @prod --release          # build on the server and start the site (runs deploy)
