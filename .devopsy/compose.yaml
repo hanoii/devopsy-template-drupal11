@@ -97,6 +97,13 @@ services:
       # it also stops with it on both sides, depending on it.
       - devopsy.data=true
       - devopsy.data.stop=import
+      # A child on the same server clones these files from the parent's
+      # by reflinks where the filesystem has them (XFS, as devopsy-server's
+      # cloud-init.yaml makes the root): their blocks are shared until
+      # either side writes, so the copy is instant and takes no room.
+      # Uploads are added, rarely rewritten; never on the database, whose
+      # pages written over shared blocks would fragment prod's files.
+      - devopsy.data.copy.reflink=true
       # The access log stays the environment's own: never copied.
       - devopsy.data.exclude=logs
     # Stopping waits for Caddy to finish the requests in flight (a sync,

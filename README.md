@@ -219,7 +219,14 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   requests in flight finish, then the database): files and database from
   the same moment, and prod is down for as long as the copy takes (the
   first time everything, later only what changed), its visitors waiting
-  on `alwaysup` meanwhile (below). The datadir carries prod's users and
+  on `alwaysup` meanwhile (below). On a server whose data is on XFS
+  (devopsy-server's `cloud-init.yaml`), prod is down for a reflink clone
+  only, seconds, and the copy is made from the clone; and a child on
+  prod's server clones `storage` from prod's rather than copying it
+  (`devopsy.data.copy.reflink`): the files share prod's blocks until
+  either side writes, so a child of a large site takes next to no room.
+  Never the database, whose pages written over shared blocks would
+  fragment prod's files. The datadir carries prod's users and
   password hashes, and the image's root password is random, so children
   use prod's `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the
   child's own. A raw copy needs a MariaDB no older than the data
