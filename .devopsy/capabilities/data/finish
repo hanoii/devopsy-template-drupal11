@@ -34,7 +34,7 @@ fi
 # Closed by default: a child that inherits no SITE_BASIC_AUTH from prod,
 # and has none of its own, gets one here, once, printed this one time.
 # Set but empty means open on purpose (devopsy @<child> --vars set
-# SITE_BASIC_AUTH with an empty value, then reload): left alone then.
+# SITE_BASIC_AUTH with an empty value, then --reload): left alone then.
 # deploy's up starts Caddy with it: no restart here.
 if [ -z "${SITE_BASIC_AUTH+set}" ]; then
   env_file="$DEVOPSY_PROJECT_DIR/.env"

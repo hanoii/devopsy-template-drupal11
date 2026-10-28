@@ -1,7 +1,0 @@
-#!/bin/sh
-## Description: Recreate the containers whose settings changed, without a build or release
-# After `devopsy @<target> --vars set ...` (or editing .env locally): running
-# containers keep their old environment until recreated. compose only
-# recreates the ones whose configuration changed, from the current image.
-set -eu
-exec devopsy up -d --wait --no-build "$@"

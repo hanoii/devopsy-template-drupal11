@@ -81,6 +81,9 @@ configuration, only database updates until then.
   anything or install packages. Never run drush as root: it leaves
   root's files in `/tmp/php` and storage that the app cannot replace.
   `devopsy @prod drush`, `exec` and `--shell` run as the app by default.
+  `APP_UID` is also the image's build argument, so changing it takes a
+  release: `--reload` refuses it, naming it, since the image would keep
+  the old user's files.
 - **Read-only.** Every container's root filesystem is read-only
   (MariaDB writes its datadir, and its socket in a tmpfs). The app's only
   writable paths are `/tmp` (a tmpfs, also Caddy's state), `/app/storage`,
@@ -126,7 +129,7 @@ configuration, only database updates until then.
   and HTTPS.
 - **Basic auth.** Set `SITE_BASIC_AUTH=user:password` in `.devopsy/.env`
   (on servers `devopsy @prod --vars set SITE_BASIC_AUTH`, then `devopsy
-  @prod reload` or a release) and Caddy asks for it on every request. The
+  @prod --reload` or a release) and Caddy asks for it on every request. The
   entrypoint hashes the password and drops the plaintext before PHP starts;
   the healthcheck, from inside the container, skips it. Unset or empty,
   the site is open (children are closed by default: "Child environments").
@@ -277,7 +280,7 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   its `shared/.env`, user `preview`, the password printed that once. To open
   a child on purpose, set the variable empty and reload:
   `SITE_BASIC_AUTH= devopsy @dev --vars set SITE_BASIC_AUTH`, then
-  `devopsy @dev reload`; set but empty stays open through later syncs,
+  `devopsy @dev --reload`; set but empty stays open through later syncs,
   unset would be closed again.
 - **Inherited settings.** prod's `inherit:` names variables every child
   gets from prod's server into its own `shared/inherit.env`, on its first
