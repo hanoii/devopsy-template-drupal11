@@ -82,6 +82,11 @@ services:
       # le-dns01-cloudflare). Unset, there is no label at all (compose
       # leaves an empty one): an empty resolver gets no certificate.
       - ${PROXY_CERTRESOLVER:+traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.tls.certresolver=$PROXY_CERTRESOLVER}
+      # The entrypoints, only when the target names them: tunnel for a site
+      # behind a Cloudflare Tunnel on a server with direct sites too (then
+      # with PROXY_CERTRESOLVER unset: a router with a resolver never matches
+      # the tunnel's plain HTTP). Unset, no label: the server's default ones.
+      - ${PROXY_ENTRYPOINTS:+traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.entrypoints=$PROXY_ENTRYPOINTS}
       # The FrankenPHP image exposes several ports: tell Traefik which one.
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}.loadbalancer.server.port=8080
       # While this container is stopped, recreating or unhealthy, Traefik
@@ -238,6 +243,7 @@ services:
       - traefik.enable=true
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.rule=${SITE_HOST_RULE:-HostRegexp(`^app\.localhost$`)}
       - ${PROXY_CERTRESOLVER:+traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.tls.certresolver=$PROXY_CERTRESOLVER}
+      - ${PROXY_ENTRYPOINTS:+traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.entrypoints=$PROXY_ENTRYPOINTS}
       # Below the app's router (a rule's length).
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.priority=2
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.service=${COMPOSE_PROJECT_NAME:-app}-alwaysup
