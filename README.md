@@ -331,6 +331,15 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   once, no waiting, until `maintenance off` or the next deploy. Edit the
   page to brand it. Nothing of this needs the server's Traefik: any
   Traefik that routes the project routes it.
+- **The gap before it: `hold@file`.** A stopping app closes its port at
+  once and finishes what is in flight, and Traefik keeps its router until
+  Docker reports the container gone or unhealthy: a request meanwhile
+  meets the closed port, Traefik's 502. Both routers name `hold@file`,
+  the server's Traefik's hold (devopsy-template-traefik's README): it
+  holds that request until a router answers, alwaysup included, and
+  sends the visitor on to the same URL. It needs a Traefik that has it:
+  release the server's Traefik first. Drop it from the routers'
+  `middlewares` labels to opt out.
 
 ## Locally
 
