@@ -126,7 +126,16 @@ configuration, only database updates until then.
 - **Settings** (`web/sites/default/settings.php`) come from the environment
   set in `compose.yaml`: database, hash salt, any host (Traefik only routes
   the environment's own), and Traefik as the reverse proxy for client IPs
-  and HTTPS.
+  and HTTPS, its only headers trusted (`X-Forwarded-For` and `-Proto`:
+  Traefik never removes `Forwarded`, which Symfony refuses with a 500 when
+  it disagrees with the others).
+- **Behind a Cloudflare Tunnel** (devopsy-template-traefik's "Behind a
+  Cloudflare Tunnel"), nothing changes on a server whose sites are all
+  tunneled. On a server with direct sites too, a tunneled one sets
+  `PROXY_ENTRYPOINTS: tunnel` in its target's `env`, with
+  `PROXY_CERTRESOLVER` unset (TLS ends at Cloudflare's edge). Both
+  routers, the app's and `alwaysup`'s, take it. Uploads through Cloudflare
+  are 100 MB at most on its Free and Pro plans.
 - **Basic auth.** Set `SITE_BASIC_AUTH=user:password` in `.devopsy/.env`
   (on servers `devopsy @prod --vars set SITE_BASIC_AUTH`, then `devopsy
   @prod --reload` or a release) and Caddy asks for it on every request. The
