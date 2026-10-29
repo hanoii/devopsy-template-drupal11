@@ -89,6 +89,11 @@ services:
       - ${PROXY_ENTRYPOINTS:+traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.entrypoints=$PROXY_ENTRYPOINTS}
       # The FrankenPHP image exposes several ports: tell Traefik which one.
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}.loadbalancer.server.port=8080
+      # hold@file: the server's Traefik (devopsy-template-traefik) holds a
+      # visitor whose request meets the closed port of a stopping app (its
+      # 502, before Traefik drops the router), and sends them on once the
+      # app answers. Drop it to opt out.
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=hold@file
       # While this container is stopped, recreating or unhealthy, Traefik
       # has no router for it and the alwaysup service's (below, priority
       # 2) answers instead: it waits for the app and streams its answer,
@@ -247,6 +252,8 @@ services:
       # Below the app's router (a rule's length).
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.priority=2
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.service=${COMPOSE_PROJECT_NAME:-app}-alwaysup
+      # Held through its own stop too, as the app's router.
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.middlewares=hold@file
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-alwaysup.loadbalancer.server.port=8080
     networks: [default, traefik]
 
