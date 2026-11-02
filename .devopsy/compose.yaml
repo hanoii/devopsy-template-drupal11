@@ -61,10 +61,9 @@ services:
       # devopsy --shell: bash here by default, as the service's user.
       - devopsy.shell=true
       # devopsy creates the mounts' entries (storage, logs) and gives them
-      # to the app's user at every release, whatever owner their files
-      # arrived with (a sync, an import, a copy by hand). Keep it in step
-      # with user: above.
-      - devopsy.mnt.owner=${APP_UID:-10001}:${APP_UID:-10001}
+      # to the app's user (user: above) at every release, whatever owner
+      # their files arrived with (a sync, an import, a copy by hand).
+      - devopsy.mnt.owner=user
       # Each release gets the server's base domain from its proxy
       # (devopsy-template-traefik exports it), for <project>-<environment>.<domain>. Without a
       # proxy running the release fails: the project expects one.
@@ -189,8 +188,9 @@ services:
       - devopsy.data=true
       - devopsy.data.copy=${DATA_DATABASE:-volumes}
       - devopsy.data.stop=${DATA_DATABASE_STOP:-own}
-      # The datadir is the mysql user's, created and kept so by devopsy.
-      - devopsy.mnt.owner=999:999
+      # The datadir is the mysql user's (user: above), created and kept so
+      # by devopsy.
+      - devopsy.mnt.owner=user
 
   # alwaysup answers for the app while its router is gone: stopped for a
   # sync or a deploy, recreating, unhealthy. Caddy tries the app every
