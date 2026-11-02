@@ -112,17 +112,16 @@ configuration, only database updates until then.
   the containers, volumes and the built image down, empties `mnt/` as root
   (its files belong to `app` and MariaDB's user), then removes the
   environment's directory. No destroy step.
-- **Ownership.** devopsy owns the mounts: `devopsy.mnt.owner` on a
+- **Ownership.** devopsy owns the mounts: `devopsy.mnt.owner=user` on a
   service (`compose.yaml`) makes it create that service's entries of
-  `mnt` and give them to the service's user at every release, whatever
+  `mnt` and give them to the service's `user:` at every release, whatever
   owner their files arrived with (a sync, an import, a copy by hand):
   `storage` and `logs` to `APP_UID`, `database` to 999. So nothing starts
-  as root to chown, and this needs a devopsy with that label: an older
-  one leaves a new environment's entries as Docker creates them, root's,
-  and the app refuses to start, saying so. `drush`, `compose exec` and
-  `devopsy --shell` (bash, the `app` service's `devopsy.shell` label) run
-  as the service's user too; `devopsy --shell database` for another
-  service.
+  as root to chown, and this needs a devopsy that takes `user` as the
+  label's value, on the server too (`devopsy @<server> --upgrade`).
+  `drush`, `compose exec` and `devopsy --shell` (bash, the `app`
+  service's `devopsy.shell` label) run as the service's user too;
+  `devopsy --shell database` for another service.
 - **Settings** (`web/sites/default/settings.php`) come from the environment
   set in `compose.yaml`: database, hash salt, any host (Traefik only routes
   the environment's own), and Traefik as the reverse proxy for client IPs

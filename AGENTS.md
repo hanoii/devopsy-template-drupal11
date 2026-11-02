@@ -31,16 +31,16 @@ the environment (`web/sites/default/settings.php`).
   capabilities.
 - **The app's UID is `APP_UID`** (10001 by default), never 0 and never
   1000 (the deploy user, in the docker group), and every place that
-  names it reads the variable: the app's `user:` and build argument, its
-  `devopsy.mnt.owner`, alwaysup, goaccess (the access log is mode 600)
-  and jq.
+  names it reads the variable: the app's `user:` (which its
+  `devopsy.mnt.owner=user` follows) and build argument, alwaysup,
+  goaccess (the access log is mode 600) and jq.
 - **Ownership is devopsy's, through `devopsy.mnt.owner`,** on each
   service that writes an entry of `mnt`: `storage` and `logs` the app's,
-  `database` 999's. Keep each label in step with its service's `user:`:
-  the label is explicit on purpose, so a change of `user:` never changes
-  the data's owner silently. Nothing in an image chowns or needs root to
-  start. Entries written from the host (`maintenance`, by `deploy`) have
-  no owner label and stay the deploy user's.
+  `database` 999's. Each is `devopsy.mnt.owner=user`, the service's own
+  numeric `user:`, so the data's owner follows a change of `user:` and
+  the two can never drift apart. Nothing in an image chowns or needs
+  root to start. Entries written from the host (`maintenance`, by
+  `deploy`) have no owner label and stay the deploy user's.
 - **Everything written at runtime lives in `mnt` or `/tmp`:** the
   release tree is read-only and goes with the next release.
   Compiled Twig is PHP Drupal includes, so it goes to `/tmp/php`
