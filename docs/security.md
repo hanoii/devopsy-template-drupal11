@@ -4,8 +4,8 @@
 
 The image (`.devopsy/Dockerfile`) is FrankenPHP, Caddy with PHP 8.4. The
 code is owned by root and only readable. The image has no setuid or
-setgid binaries and no file capabilities: FrankenPHP's, for ports below
-1024, is removed, and the app listens on 8080.
+setgid binaries and no file capabilities. FrankenPHP's capability for
+ports below 1024 is removed, and the app listens on 8080.
 
 ## No privilege
 
@@ -14,13 +14,14 @@ as root. The app, alwaysup and the tools run as `APP_UID`, 10001 by
 default (never 1000, the deploy user on devopsy servers), and MariaDB as
 its image's user, 999. Each drops every capability and sets
 `no-new-privileges`; alwaysup keeps the one capability its upstream Caddy
-binary needs to start. A compromised app finds no way up: `devopsy @prod
---shell app --user root` is a root without capabilities, which cannot
-read the app's mode-600 files, chown anything or install packages.
+binary needs to start. `devopsy @prod --shell app --user root` is a root
+without capabilities, which cannot read the app's mode-600 files, chown
+anything or install packages, so a compromised app has no way to
+escalate.
 
 Never run drush as root. It leaves root's files in `/tmp/php` and in
-storage, which the app cannot replace. `devopsy @prod drush`, `exec` and
-`--shell` run as the app by default.
+storage, which the app cannot replace. `devopsy @prod drush` runs as the
+app by default ([Ownership](#ownership)).
 
 `APP_UID` is also the image's build argument, so changing it takes a
 release. `--reload` refuses the change and names the variable, since the
@@ -39,7 +40,7 @@ datadir, and its socket in a tmpfs. The app can write only to:
 
 Caddy never runs PHP from `sites/`, however a request writes the path
 (path info, any case, a directory's `index.php`), so what the app writes
-there is only ever served as a file (`.devopsy/docker/Caddyfile`).
+there is only served as a file (`.devopsy/docker/Caddyfile`).
 
 Caddy runs only Drupal's entry points, as Drupal's own `web/.htaccess`
 allows: `index.php` and `update.php` at the web root, and the scripts
@@ -48,11 +49,11 @@ directly in `core/` (`install.php`, `rebuild.php`, `authorize.php`).
 tests, gets a 403.
 
 Symbolic links in public files are removed. Caddy follows links, so one
-written into public files would serve its target (private files, the access log)
-to anyone, across releases. Drupal never creates them. At every start the
-app removes any link under `storage/public`, saying so in its log, and
-turns `storage/public` and `storage/private` back into directories when
-they are links.
+written into public files would serve its target (private files, the
+access log) to anyone, across releases. Drupal never creates them. At
+every start the app removes any link under `storage/public`, saying so
+in its log, and turns `storage/public` and `storage/private` back into
+directories when they are links.
 
 Compiled Twig, which is PHP that Drupal includes, lives in `/tmp/php`
 instead of Drupal's default `storage/public/php`, so it cannot outlive
@@ -70,10 +71,10 @@ breaks modules that shell out.
 
 ## Ownership
 
-devopsy owns the mounts. `devopsy.mnt.owner=user` on a service
+devopsy sets the mounts' owners. `devopsy.mnt.owner=user` on a service
 (`compose.yaml`) makes it create that service's entries of `mnt` and give
-them to the service's `user:` at every release, whatever owner their
-files arrived with (a sync, an import, a copy by hand): `storage` and
+them to the service's `user:` at every release, regardless of the owner
+their files arrived with (a sync, an import, a copy by hand): `storage` and
 `logs` to `APP_UID`, `database` to 999. Nothing starts as root to chown.
 This needs a devopsy that takes `user` as the label's value, on the
 server too (`devopsy @<server> --upgrade`).
