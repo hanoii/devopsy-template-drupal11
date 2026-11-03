@@ -58,7 +58,7 @@ It reads only the current file. `--rotated <n>`, or `all`, adds the
 latest rotated files, and every run parses them again.
 
 Its settings are in `.devopsy/goaccess.conf`: the log format, and what
-counts as a static request. "Requested Files" lists pages and PHP, and
+counts as a static request, so "Requested Files" lists pages and PHP, and
 `devopsy @prod goaccess --ignore-statics=panel` shows only those.
 
 FrankenPHP runs PHP inside Caddy, so a Drupal request's `duration` is
@@ -88,7 +88,8 @@ those requests out of the access log. Change it there, or per target in
 
 The image builds on FrankenPHP's floating `1-php8.4-trixie` tag, and
 devopsy builds with `--pull`, so every release builds on that tag's
-current image and PHP updates come with releases. After a PHP advisory,
+current image and PHP updates come with releases, never before. After a
+PHP advisory,
 release each environment (`devopsy @prod --release`, and its children)
 and check `devopsy @prod --status`, which shows the PHP the app runs.
 MariaDB floats on its series too ([Child environments](children.md)).

@@ -14,10 +14,10 @@ as root. The app, alwaysup and the tools run as `APP_UID`, 10001 by
 default (never 1000, the deploy user on devopsy servers), and MariaDB as
 its image's user, 999. Each drops every capability and sets
 `no-new-privileges`; alwaysup keeps the one capability its upstream Caddy
-binary needs to start. `devopsy @prod --shell app --user root` is a root
-without capabilities, which cannot read the app's mode-600 files, chown
-anything or install packages, so a compromised app has no way to
-escalate.
+binary needs to start. A compromised app finds no way to escalate:
+even `devopsy @prod --shell app --user root` is a root without
+capabilities, which cannot read the app's mode-600 files, chown anything
+or install packages.
 
 Never run drush as root. It leaves root's files in `/tmp/php` and in
 storage, which the app cannot replace. `devopsy @prod drush` runs as the

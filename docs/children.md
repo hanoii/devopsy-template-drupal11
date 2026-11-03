@@ -50,7 +50,8 @@ inherit. `DRUPAL_HASH_SALT` stays the child's.
 
 ## MariaDB's version
 
-A raw copy needs a MariaDB no older than the data. `compose.yaml` floats
+A raw copy needs a MariaDB no older than the data, since an older one
+cannot read a newer one's datadir. `compose.yaml` floats
 MariaDB on the 11.8 LTS series (`mariadb:${MARIADB_VERSION:-11.8}`;
 `mariadb:11` would let a plain release cross series), and every release
 pulls its fixes. The same variable is the data's version

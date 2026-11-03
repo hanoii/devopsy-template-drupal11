@@ -11,9 +11,9 @@ failing its healthcheck.
 
 `alwaysup` tries the app every second for up to `ALWAYSUP_WAIT` (60 s)
 and streams its answer, so a visitor who arrived while the app was down
-gets the real page, late. If the app does not come back in time,
-`alwaysup` answers `.devopsy/docker/alwaysup/index.html` with status 503
-and `Retry-After`, for any method. The app's answers pass through
+gets the real page, late. When the app does not come back in time, and
+only then, `alwaysup` answers `.devopsy/docker/alwaysup/index.html` with
+status 503 and `Retry-After`, for any method. The app's answers pass through
 untouched, including Drupal's maintenance mode.
 
 `devopsy @prod maintenance on` takes the site down on purpose. It stops
