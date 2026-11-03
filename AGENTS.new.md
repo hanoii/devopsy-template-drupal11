@@ -34,6 +34,7 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 - `MARIADB_AUTO_UPGRADE` updates the system tables when the image moves up.
 - The next LTS is an edit in `compose.yaml`, then one `--release --accept-image database` per environment.
 - FrankenPHP's base floats (`dunglas/frankenphp:1-php8.4-trixie`), and build mode builds with `--pull`, so PHP's fixes arrive with releases; `--status` prints the PHP the app runs (`capabilities/status/show`).
+- A change existing environments must act on is marked `!` in its commit (for example `feat!:`).
 
 ## Images
 
