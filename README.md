@@ -9,8 +9,9 @@ build-mode releases, or as a starting point for a Drupal site.
 
 This template is meant to be copied and changed. Start a project from it
 on GitHub ("Use this template"), or clone it and keep this repository as a
-remote (`upstream`) to pull its changes when you choose. Your copy and your
-servers change only when you release.
+remote (`upstream`) to pull its changes when you choose. Nothing from
+this repository reaches your copy or your servers until you pull its
+changes and release them.
 
 ## Try it
 
