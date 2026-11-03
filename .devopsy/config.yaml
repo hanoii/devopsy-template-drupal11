@@ -1,4 +1,4 @@
-# devopsy config: see devopsy-cli's README, "Servers". Committed: no
+# devopsy config: see devopsy-cli's docs/config.md. Committed: no
 # secrets and no servers here. The server comes from the address
 # (devopsy @vm1:prod), or DEVOPSY_SERVER (or DEVOPSY_SERVER_<ENVIRONMENT>) in
 # .devopsy/.env or the environment, like DEVOPSY_SERVER=devopsy@203.0.113.10.
@@ -17,7 +17,7 @@ defaults:
 environments:
   # inherit: variables every child gets from prod's server files, into
   # its shared/inherit.env, on its first release, every sync and
-  # --inherit (devopsy-cli's README, "Parent environments and syncs"):
+  # --inherit (devopsy-cli's docs/syncs.md):
   # DATA_DATABASE, so both sides copy the database the same way
   # (compose.yaml); DB_PASSWORD, so a raw datadir (which carries prod's
   # password) and a dump (imported into a database created with it) both

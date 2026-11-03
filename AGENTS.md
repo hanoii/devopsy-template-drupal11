@@ -1,6 +1,6 @@
 # AGENTS.md
 
-devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [devopsy-cli](https://github.com/hanoii/devopsy-cli): built on the server (build mode), read-only at runtime, children synced from prod. `README.md` is how to use it, kept in step with every change; how a file works is in its comments (`compose.yaml` explains every label).
+devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [devopsy-cli](https://github.com/hanoii/devopsy-cli): built on the server (build mode), read-only at runtime, children synced from prod. `README.md` and `docs/` are how to use it, kept in step with every change; how a file works is in its comments (`compose.yaml` explains every label).
 
 ## Workflow
 
