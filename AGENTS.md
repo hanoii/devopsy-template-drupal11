@@ -100,9 +100,12 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 - No symlinks in public files: the entrypoint removes every one under `storage/public` at each start, saying which (`docker/entrypoint`), and fails when it cannot, since Caddy's file_server follows links and has no setting not to, so a link the app was tricked into writing would serve its target anonymously.
 - Accepted: a link is served between its creation and the next start.
 - `public/` and `private/` themselves, when links, are removed, said, and made again as directories before anything tests them, since `-e`, `-d` and `-w` follow links.
-- MariaDB floats on its LTS series (`mariadb:11.8`, never `mariadb:11`, which a plain release would carry across series), so every release pulls its fixes, while devopsy keeps the database going forward only and holds a child on the parent's exact image after a raw datadir sync (an older MariaDB cannot read a newer one's data).
+- MariaDB floats on its LTS series (`mariadb:${MARIADB_VERSION:-11.8}`, never `mariadb:11`, which a plain release would carry across series with the version unchanged), so every release pulls its fixes.
+- The same variable is the database's `devopsy.data.version`, so devopsy never runs its data on a lower version: a rollback to an older series is refused, and a child below its parent is refused before a raw datadir sync (an older MariaDB cannot read a newer one's data).
+- The way back from an upgrade is the release snapshot taken before it.
 - `MARIADB_AUTO_UPGRADE` updates the system tables when the image moves up.
-- The next LTS is an edit in `compose.yaml`, then one `--release --accept-image database` per environment.
+- The next LTS is a higher `MARIADB_VERSION`, which a release takes.
+- The app's data is files, so it carries `devopsy.data.version=any`: devopsy checks nothing for its image.
 - FrankenPHP's base floats (`dunglas/frankenphp:1-php8.4-trixie`), and build mode builds with `--pull`, so PHP's fixes arrive with releases; `--status` prints the PHP the app runs (`capabilities/status/show`).
 - A change existing environments must act on is marked `!` in its commit (for example `feat!:`).
 
