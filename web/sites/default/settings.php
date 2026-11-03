@@ -44,9 +44,10 @@ $settings['trusted_host_patterns'] = ['.*'];
 
 // Requests only reach the app through devopsy-traefik, over Docker networks,
 // so the peer is always Traefik: trust it for the client IP and HTTPS, the
-// two headers it always sets itself. Not for the others: Traefik never
-// removes Forwarded, and Symfony answers a 500 when it conflicts with
-// X-Forwarded-Host; the host and port come from the Host header.
+// two headers it always sets itself. Not for the others: plain Traefik
+// passes a visitor's Forwarded on (devopsy-template-traefik drops it), and
+// Symfony answers a 500 when it conflicts with X-Forwarded-Host; the host
+// and port come from the Host header.
 if (PHP_SAPI !== 'cli' && !empty($_SERVER['REMOTE_ADDR'])) {
   $settings['reverse_proxy'] = TRUE;
   $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR']];

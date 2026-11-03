@@ -1,5 +1,5 @@
 #!/bin/sh
-# The data capability's import (devopsy-cli's README, "Capabilities"):
+# The data capability's import (devopsy-cli's docs/capabilities.md):
 # reads one service's data from stdin, as export writes it, and replaces
 # what the service had. devopsy runs it on the child, in its current
 # release with its environment, for each service copied as

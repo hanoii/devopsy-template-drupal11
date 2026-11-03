@@ -1,5 +1,5 @@
 #!/bin/sh
-# The data capability's finish (devopsy-cli's README, "Capabilities"):
+# The data capability's finish (devopsy-cli's docs/capabilities.md):
 # devopsy runs it on each side with parent|child and go (the copy is
 # complete, the services back), abort (nothing of the parent's was
 # written, the services back) or, on the child, partial (written in part:

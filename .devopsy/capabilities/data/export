@@ -1,5 +1,5 @@
 #!/bin/sh
-# The data capability's export (devopsy-cli's README, "Capabilities"):
+# The data capability's export (devopsy-cli's docs/capabilities.md):
 # writes one service's data to stdout. devopsy runs it on the parent, in
 # its current release with its environment, for each service copied as
 # devopsy.data.copy=custom when a child is synced (its first release, or
