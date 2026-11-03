@@ -1,8 +1,8 @@
 # devopsy-template-drupal11
 
 Drupal 11 on a [devopsy](https://github.com/hanoii/devopsy-cli) server.
-The image is built on the server from this project, the code is
-read-only at runtime, and MariaDB 11 keeps the data. Use it to try
+The image is built on the server from this project and its code is
+read-only at runtime; MariaDB 11 keeps the data. Use it to try
 build-mode releases, or as a starting point for a Drupal site.
 
 ## Using this template
@@ -22,14 +22,14 @@ echo DEVOPSY_SERVER=devopsy@203.0.113.10 >> .devopsy/.env
 ```
 
 Each environment gets a URL, `<project>-<environment>.<server's base
-domain>`, named after its compose project (`drupal11-prod`). Each release
-imports the base domain from the server's proxy
-([devopsy-template-traefik](https://github.com/hanoii/devopsy-template-traefik)) through the `devopsy.import` label in
-`compose.yaml`, and fails while no proxy runs. The release says what it
-imported, and `devopsy @prod --debug imports` shows it later, with
-whether the proxy has changed it since. To override it per target, or
-set it empty for no URL: `devopsy @prod --vars set --show
-PROXY_BASE_DOMAIN`.
+domain>`, named after its compose project (`drupal11-prod`). Every
+release imports the base domain from the server's proxy
+([devopsy-template-traefik](https://github.com/hanoii/devopsy-template-traefik))
+through the `devopsy.import` label in `compose.yaml`, and fails while no
+proxy runs. The release prints what it imported. `devopsy @prod --debug
+imports` shows it later, and whether the proxy has changed it since.
+Override it per target, or set it empty for no wildcard URL, with
+`devopsy @prod --vars set --show PROXY_BASE_DOMAIN`.
 
 ```sh
 devopsy @prod --release          # build on the server and start the site (runs deploy)
@@ -43,13 +43,14 @@ devopsy @prod goaccess         # the access log in GoAccess's terminal view (q q
 devopsy @prod goaccess > report.html   # or as an HTML report
 devopsy @prod --releases
 devopsy @prod --status         # the release, its containers, the URL, maintenance mode, Drupal's version
-devopsy @prod maintenance on   # take the site down on purpose, its page shown at once; off brings it back
+devopsy @prod maintenance on   # take the site down on purpose and show its page; off brings it back
 devopsy @prod --destroy        # remove it all: containers, database, files
 ```
 
-The first release generates `DB_PASSWORD` and `DRUPAL_HASH_SALT` into the
-server's `shared/.env` with `secrets`, its prepare step, before it goes
-live. Then `deploy` starts an empty site; it never installs Drupal.
+On the first release, the `secrets` prepare step generates `DB_PASSWORD`
+and `DRUPAL_HASH_SALT` into the server's `shared/.env`, before the
+release goes live. `deploy` starts an empty site and never installs
+Drupal.
 Browse to the site for Drupal's installer, which skips the database step
 because the settings come from the environment, or install with drush.
 
