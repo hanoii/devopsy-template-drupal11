@@ -11,20 +11,22 @@ starts the image. Composer runs inside the image; `vendor/` and
 
 Docker's build cache makes a release without dependency changes take
 seconds. Composer keeps its downloads in a BuildKit cache mount, and the
-image copies vendor, core and contrib in their own layers before the
+image copies vendor, core and contrib in separate layers before the
 code, so most releases rebuild only the code layer, well under 1 MB here.
 
-Code changes need a release. OPcache never revalidates, since the code
-cannot change, and modules are added with composer, then released.
+Code changes need a release. OPcache never revalidates; the code cannot
+change. Add modules with composer, then release.
 
 ## Settings
 
 Drupal's settings (`web/sites/default/settings.php`) come from the
-environment set in `compose.yaml`: the database, the hash salt, any host
-(Traefik routes only the environment's own), and Traefik as the reverse
-proxy for client IPs and HTTPS. Only Traefik's `X-Forwarded-For` and
-`-Proto` headers are trusted. Traefik does not remove `Forwarded`, and
-Symfony answers a 500 when that header disagrees with the others.
+environment set in `compose.yaml`: the database, the hash salt, and
+Traefik as the reverse proxy for client IPs and HTTPS. Any host is
+accepted, since Traefik routes only the environment's own. Only
+Traefik's `X-Forwarded-For` and `-Proto` headers are trusted. Plain
+Traefik passes a visitor's `Forwarded` on (devopsy-template-traefik
+drops it), and Symfony answers a 500 when that header disagrees with the
+others.
 
 ## Behind a Cloudflare Tunnel
 
@@ -41,22 +43,26 @@ are at most 100 MB on its Free and Pro plans.
 
 Caddy logs each request as a JSON line, to the container's output
 (`devopsy @prod logs -f app`) and to `/app/logs/access.log`. That file is
-a mount of its own (`.devopsy/mnt/logs`, on servers `shared/mnt/logs`),
+a separate mount (`.devopsy/mnt/logs`, on servers `shared/mnt/logs`),
 so it outlives containers and releases and stays out of the site's files.
 It is rotated at 100MiB, with old files compressed, 10 kept, for 90 days
 at most (`docker/Caddyfile`).
 
 `devopsy goaccess` opens the log in [GoAccess](https://goaccess.io), in
-its own container where the site runs (the `goaccess` service, which `up`
-never starts). At a terminal it shows GoAccess's terminal view, which
-follows new requests; redirected, it writes an HTML report (`devopsy
-@prod goaccess > report.html`); `-o json` gives JSON. It reads only the
-current file unless `--rotated <n>` (or `all`) adds the latest rotated
-ones, and every run parses them again. Its settings are in
-`.devopsy/goaccess.conf`: the log format, and what counts as a static
-request, so "Requested Files" lists pages and PHP, and `devopsy @prod
-goaccess --ignore-statics=panel` shows only those. FrankenPHP runs PHP
-inside Caddy, so a Drupal request's `duration` is PHP's time.
+a separate container where the site runs (the `goaccess` service, which
+`up` never starts). At a terminal it shows GoAccess's terminal view,
+which follows new requests. Redirected, it writes an HTML report
+(`devopsy @prod goaccess > report.html`), and `-o json` gives JSON.
+
+It reads only the current file. `--rotated <n>`, or `all`, adds the
+latest rotated files, and every run parses them again.
+
+Its settings are in `.devopsy/goaccess.conf`: the log format, and what
+counts as a static request. "Requested Files" lists pages and PHP, and
+`devopsy @prod goaccess --ignore-statics=panel` shows only those.
+
+FrankenPHP runs PHP inside Caddy, so a Drupal request's `duration` is
+PHP's time.
 
 `devopsy accesslog` prints requests as they come, one per line with
 their milliseconds, from the container's output through `jq` (the `jq`
@@ -80,10 +86,9 @@ those requests out of the access log. Change it there, or per target in
 
 ## Updates
 
-PHP updates come with releases. The image builds on FrankenPHP's floating
-`1-php8.4-trixie` tag, and devopsy builds with `--pull`, so every release
-builds on that tag's current image. PHP's security fixes reach an
-environment at its next release, and not before. After a PHP advisory,
+The image builds on FrankenPHP's floating `1-php8.4-trixie` tag, and
+devopsy builds with `--pull`, so every release builds on that tag's
+current image and PHP updates come with releases. After a PHP advisory,
 release each environment (`devopsy @prod --release`, and its children)
 and check `devopsy @prod --status`, which shows the PHP the app runs.
 MariaDB floats on its series too ([Child environments](children.md)).
@@ -104,12 +109,11 @@ devopsy exec -T app sh -c 'cd /tmp/sync && tar c .' | tar x -C config/sync
 `devopsy @prod --rollback` switches to the previous release, with the
 image it ran, and runs `secrets` and `deploy` there. devopsy keeps each
 release's image, so nothing is rebuilt. Database updates are not undone,
-and the database image does not go back: it stays on the newest image its
-data ran.
+and the database keeps the newest image its data ran.
 
 ## Destroying
 
-`devopsy @prod --destroy` is devopsy's alone; the project has no destroy
+`devopsy @prod --destroy` comes from devopsy; the project has no destroy
 step. It takes down the containers, the volumes and the built image,
 empties `mnt/` as root (its files belong to `app` and to MariaDB's user),
 then removes the environment's directory.
