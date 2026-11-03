@@ -106,6 +106,11 @@ services:
       # it also stops with it on both sides, depending on it.
       - devopsy.data=true
       - devopsy.data.stop=import
+      # Its data is files, which any build of the app reads, so devopsy
+      # checks nothing for them: releases and rollbacks run whatever app
+      # image they built. Every data service says its data's version; the
+      # database's is a number (below).
+      - devopsy.data.version=any
       # A child on the same server clones these files from the parent's
       # by reflinks where the filesystem has them (XFS, as devopsy-server's
       # cloud-init.yaml makes the root): their blocks are shared until
@@ -121,17 +126,20 @@ services:
     networks: [default, traefik]
 
   database:
-    # Floats on the 11.8 LTS series: every release pulls its fixes. devopsy
-    # keeps the database going forward only (a rollback leaves it on the
-    # newest image its data ran, and a release whose image moved back is
-    # refused) and holds a child on the parent's exact image after a sync
-    # that copies the datadir raw (older cannot read newer); a dump
-    # (DATA_DATABASE=custom) loads through the child's own image.
+    # Floats on its LTS series, 11.8 (MARIADB_VERSION): every release
+    # pulls its fixes. The same variable is the data's version
+    # (devopsy.data.version, below), so devopsy never runs the data on a
+    # lower one: a rollback to a release of an older series is refused
+    # (fix forward, or restore the release snapshot taken before the
+    # upgrade), and so is a child below its parent before a sync copies
+    # the datadir raw (older cannot read newer); a dump
+    # (DATA_DATABASE=custom) loads through the child's own image too.
     # MARIADB_AUTO_UPGRADE updates the system tables on start. Never
-    # `mariadb:11`: a plain release would cross series. Moving to the next
-    # LTS is an edit here, then one `--release --accept-image database`
-    # per environment.
-    image: mariadb:11.8
+    # `mariadb:11`: a plain release would cross series within the tag,
+    # the version label unchanged. Moving to the next LTS is setting
+    # MARIADB_VERSION (or its default in both places here): a higher
+    # version, which a release takes.
+    image: mariadb:${MARIADB_VERSION:-11.8}
     restart: unless-stopped
     # As the image's mysql user (999) from the first process, without
     # capabilities: its entrypoint only starts as root to chown the
@@ -186,6 +194,8 @@ services:
       # dump.sql and devopsy --import database < dump.sql. none
       # (DATA_DATABASE=none) leaves the database out of every copy.
       - devopsy.data=true
+      # Its data's version: the image's series, from the same variable.
+      - devopsy.data.version=${MARIADB_VERSION:-11.8}
       - devopsy.data.copy=${DATA_DATABASE:-volumes}
       - devopsy.data.stop=${DATA_DATABASE_STOP:-own}
       # The datadir is the mysql user's (user: above), created and kept so

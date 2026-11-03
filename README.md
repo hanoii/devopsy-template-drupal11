@@ -242,12 +242,15 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   use prod's `DB_PASSWORD` (inherited). `DRUPAL_HASH_SALT` stays the
   child's own. A raw copy needs a MariaDB no older than the data
   (older cannot read newer): `compose.yaml` floats it on the 11.8 LTS
-  series (`mariadb:11.8`, never `mariadb:11`, which a plain release
-  would carry across series), every release pulls its fixes, devopsy
-  keeps the database going forward only, and after a sync that copies
-  the datadir the child runs the parent's exact image (a dump, below,
-  loads through the child's own). Moving to the next series is an edit there
-  and one `--release --accept-image database` per environment.
+  series (`mariadb:${MARIADB_VERSION:-11.8}`, never `mariadb:11`, which
+  a plain release would carry across series), every release pulls its
+  fixes, and the same variable is the data's version
+  (`devopsy.data.version`): devopsy refuses to run the data on a lower
+  one, a rollback to an older series or a child below its parent before
+  a sync. Each side runs its own image on the copy. Moving to the next
+  series is a higher `MARIADB_VERSION` (`devopsy @prod --vars set
+  MARIADB_VERSION <series>`, or its default in `compose.yaml`), which a
+  release takes; the release snapshot taken before it is the way back.
 - **A dump instead:** `DATA_DATABASE=custom` on prod (`devopsy @prod
   --vars set --show DATA_DATABASE custom`; children inherit it, so both
   sides agree) streams the database instead of copying its datadir:
@@ -307,7 +310,11 @@ devopsy @dev --sync             # copy prod again (asks for the name; --yes skip
   to copy a datadir under a child's running database). `devopsy.data=true`
   says a service has data, on `app` and `database`; `devopsy.data.copy`
   says how a copy carries it: the default `volumes` (its entries of
-  `mnt` as files) on `app`, `${DATA_DATABASE:-volumes}` on `database`. `devopsy.data.stop` says when it is stopped: `import` on
+  `mnt` as files) on `app`, `${DATA_DATABASE:-volumes}` on `database`.
+  `devopsy.data.version` says each one's data's version: `any` on `app`
+  (its files do not depend on its image: nothing checked),
+  `${MARIADB_VERSION:-11.8}` on `database`, the variable its image's tag
+  reads too. `devopsy.data.stop` says when it is stopped: `import` on
   `app` (while any data is imported), `${DATA_DATABASE_STOP:-own}` on
   `database` (while its own data moves), which the `env` capability
   turns to `never` with `DATA_DATABASE=custom`; and a service that
