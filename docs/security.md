@@ -47,8 +47,8 @@ directly in `core/` (`install.php`, `rebuild.php`, `authorize.php`).
 `autoload.php`, and any PHP in modules, themes, libraries or core's
 tests, gets a 403.
 
-Public files hold no symbolic links. Caddy follows links, so one written
-into public files would serve its target (private files, the access log)
+Symbolic links in public files are removed. Caddy follows links, so one
+written into public files would serve its target (private files, the access log)
 to anyone, across releases. Drupal never creates them. At every start the
 app removes any link under `storage/public`, saying so in its log, and
 turns `storage/public` and `storage/private` back into directories when
