@@ -1,6 +1,6 @@
 History, not rules: AGENTS.md's Rules win where they differ.
 
-- Compiled Twig once went to `public://php`; an existing site's `storage/public/php` can be removed by hand once released.
+- Compiled Twig once went to `public://php`.
 - The `sites/` rule was a regex on the request path before: `evil.php/x`, `evil.php%2Fx` and `evil.PHP` ran, and a directory's `index.php` ran from `files/evil/`. Unanchored, the next match refused files like `my.pharmacy.jpg` and `report.php.pdf`, and their image style derivatives once written.
 - Comparing `frankenphp adapt` by hand rather than in a build: the base floats, so a build failing on every FrankenPHP change would block releases.
 - Only Drupal's entry scripts: php_server ran any PHP under the web root (checked: a module's `evil.php`, `vendor/autoload.php` and a directory's `index.php` ran, and core's fixtures answered 500), while Drupal's own Apache setup refuses it. `autoload_runtime.php` is a scaffold file newer than `.htaccess`'s rule. Checked against the built image run as compose runs it (10001, no capabilities, read-only, Drupal installed): the front page, `/index.php/...`, `/update.php` (logged in), `core/install.php`, `rebuild.php` and `authorize.php`, static files and image style derivatives reach what they did; everything else is a 403.

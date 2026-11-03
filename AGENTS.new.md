@@ -9,7 +9,7 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 
 ## Rules
 
-- No container has privilege: each runs as its own numeric UID from its first process (`user:` in `compose.yaml`), with `cap_drop: [ALL]` and `no-new-privileges`, read-only where the image allows, so the site holds up with the app fully compromised: its code finds nothing to escalate with, and a `--user 0` shell is a root without capabilities.
+- No container has privilege: each runs as its own numeric UID from its first process (`user:` in `compose.yaml`), with `cap_drop: [ALL]` and `no-new-privileges`, read-only where the image allows, since the site must hold up with the app fully compromised (its code finds nothing to escalate with, and a `--user 0` shell is a root without capabilities).
 - A capability comes back only with a stated reason (alwaysup's `NET_BIND_SERVICE`, below).
 - Images built here carry no setuid or setgid binaries and no file capabilities.
 - The app's UID is `APP_UID` (10001 by default), never 0 and never 1000 (the deploy user, in the docker group), and every place that names it reads the variable: the app's `user:` and build argument, alwaysup, goaccess (the access log is mode 600) and jq.
@@ -17,14 +17,15 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 - Nothing in an image chowns or needs root to start.
 - Entries written from the host (`maintenance`, by `deploy`) have no owner label and stay the deploy user's.
 - Everything written at runtime goes in `mnt` or `/tmp`: the release tree is read-only and goes with the next release.
-- Compiled Twig goes to `/tmp/php` (`php_storage` in settings.php), never `public://php`, since it is PHP Drupal includes and would outlive releases there.
+- Compiled Twig goes to `/tmp/php` (`php_storage` in settings.php), never `public://php`, since it is PHP Drupal includes and would outlive releases there; an existing site's `storage/public/php` can be removed by hand once released.
 - No PHP runs from `sites/`, however a request writes the path (`docker/Caddyfile`): `sites/default/files` is the storage mount, the one place under the web root the app can write, so a file the app was tricked into writing must never become code.
 - The `sites/` check sits between php_server's rewrite and its php handler, where the path is the script PHP would run, which is why php_server is written out (FrankenPHP's own expansion, from `frankenphp adapt`).
 - The `sites/` match ignores case and is exactly what reaches the php handler, a script or one with path info (`\.php(/|$)`), never a regex on the request path: PHP splits at `.php` ignoring case and passes the rest as path info, and a directory's `index.php` runs from a request with no `.php` in it.
 - The match is anchored on what reaches the handler, so files whose names only contain `.php` (for example `my.pharmacy.jpg`, `report.php.pdf`) and their image style derivatives are served.
 - When FrankenPHP's php_server changes, compare `frankenphp adapt` of a bare `php_server` with the route, by hand, as part of updating the base's tag or reviewing a FrankenPHP release: a build that diffs the two would block a release carrying PHP's security fix until the Caddyfile caught up.
-- Only Drupal's entry scripts run (`docker/Caddyfile`, `@other_php`, beside the `sites/` rule): `index.php` and `update.php` at the web root, the scripts directly in `core/` without path info (`install.php`, `rebuild.php`, `authorize.php`), and `autoload_runtime.php`, which run alone only fails; code in modules, themes, libraries and core's tests is never meant to run alone.
-- The entry-script rule is Drupal's own, from its `web/.htaccess` (`RewriteRule "^(.+/.*|autoload)\.php($|/)" - [F]`, except `RewriteCond %{REQUEST_URI} !/core/[^/]*\.php$`), matched on the script php_server would run, with its path info, ignoring case as PHP's split does.
+- Only Drupal's entry scripts run (`docker/Caddyfile`, `@other_php`, beside the `sites/` rule): `index.php` and `update.php` at the web root, and the scripts directly in `core/` without path info (`install.php`, `rebuild.php`, `authorize.php`); code in modules, themes, libraries and core's tests is never meant to run alone.
+- The entry-script rule is Drupal's own, from its `web/.htaccess` (`RewriteRule "^(.+/.*|autoload)\.php($|/)" - [F]`, except `RewriteCond %{REQUEST_URI} !/core/[^/]*\.php$`), matched on the script php_server would run, with its path info, ignoring case as PHP's split does; the exception as Drupal writes it, case-sensitive.
+- `autoload.php` and `autoload_runtime.php` at the root are refused too (the latter a scaffold file newer than the rule, which run alone only fails).
 - The test front controllers `.htaccess` lets through (`core/modules/system/tests/`) stay refused: they are for core's own test runs.
 - No symlinks in public files: the entrypoint removes every one under `storage/public` at each start, saying which (`docker/entrypoint`), and fails when it cannot, since Caddy's file_server follows links and has no setting not to, so a link the app was tricked into writing would serve its target anonymously.
 - Accepted: a link is served between its creation and the next start.
@@ -102,7 +103,6 @@ devopsy restart app && devopsy logs app | grep 'removing the symlink'
 
 - Files whose names only contain `.php` are served (200): `my.pharmacy.jpg` and `report.php.pdf` in `storage/public`, and an image style derivative of the first, requested twice (the second from the file Drupal wrote).
 - Then the site: the installer, an image upload with an image style, `drush uli`, `drush cr`, `config:export --destination=/tmp/sync`, and `--export`/`--import database` with `DATA_DATABASE=custom` and with the default `volumes`.
-- A change existing environments must act on is marked `!` in its commit (for example `feat!:`).
 
 ## Histories
 
