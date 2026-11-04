@@ -125,7 +125,7 @@ services:
     # Stopping waits for Caddy to finish the requests in flight (a sync,
     # a deploy): Compose's default is 10s.
     stop_grace_period: 30s
-    networks: [default, proxy]
+    networks: [private, proxy]
 
   database:
     # Floats on its LTS series, 11.8 (MARIADB_VERSION): every release
@@ -203,6 +203,7 @@ services:
       # The datadir is the mysql user's (user: above), created and kept so
       # by devopsy.
       - devopsy.mnt.owner=user
+    networks: [private]
 
   # alwaysup answers for the app while its router is gone: stopped for a
   # sync or a deploy, recreating, unhealthy. Caddy tries the app every
@@ -264,7 +265,7 @@ services:
       # Held through its own stop too, as the app's router.
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.middlewares=hold@file
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-alwaysup.loadbalancer.server.port=8080
-    networks: [default, proxy]
+    networks: [private, proxy]
 
   # GoAccess for `devopsy goaccess`: it reads the access log files Caddy
   # writes in mnt/logs, as their owner, and prints a report. Never started
@@ -309,7 +310,7 @@ services:
 
 networks:
   # What is only here, like the database, has no way out.
-  default:
+  private:
     internal: true
   proxy:
     name: ${COMPOSE_PROJECT_NAME:-drupal11}_proxy
