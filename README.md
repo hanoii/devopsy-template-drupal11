@@ -29,6 +29,8 @@ release imports the base domain from the server's proxy
 through the `devopsy.import` label in `compose.yaml`, and fails while no
 proxy runs. The release prints what it imported. `devopsy @prod --debug
 imports` shows it later, and whether the proxy has changed it since.
+Release the server's Traefik first, since an older one does not join
+this project's network.
 Override it per target, or set it empty for no wildcard URL, with
 `devopsy @prod --vars set --show PROXY_BASE_DOMAIN`.
 

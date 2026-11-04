@@ -69,6 +69,8 @@ services:
       # proxy running the release fails: the project expects one.
       - devopsy.import.PROXY_BASE_DOMAIN=proxy/BASE_DOMAIN
       - traefik.enable=true
+      # The network Traefik reaches this on, which it joins by itself.
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-drupal11}_proxy
       # SITE_HOST_RULE: the target's PROXY_DOMAINS plus
       # <compose project>.<PROXY_BASE_DOMAIN>, computed by
       # capabilities/env/compute. The fallback, for plain docker compose, is
@@ -123,7 +125,7 @@ services:
     # Stopping waits for Caddy to finish the requests in flight (a sync,
     # a deploy): Compose's default is 10s.
     stop_grace_period: 30s
-    networks: [default, traefik]
+    networks: [default, proxy]
 
   database:
     # Floats on its LTS series, 11.8 (MARIADB_VERSION): every release
@@ -228,11 +230,7 @@ services:
     command: [caddy, run, --config, /alwaysup/Caddyfile, --adapter, caddyfile]
     environment:
       ALWAYSUP_WAIT: ${ALWAYSUP_WAIT:-60s}
-      # The app by a name Docker's DNS only answers on this project's
-      # network: a plain `app` is also an alias on the shared traefik
-      # network, where every project's app carries it, and with ours
-      # stopped it would resolve to another project's.
-      ALWAYSUP_UPSTREAM: app.${COMPOSE_PROJECT_NAME:-drupal11}_default:8080
+      ALWAYSUP_UPSTREAM: app:8080
       XDG_DATA_HOME: /tmp/data
       XDG_CONFIG_HOME: /tmp/config
     healthcheck:
@@ -256,6 +254,7 @@ services:
       - no-new-privileges
     labels:
       - traefik.enable=true
+      - traefik.docker.network=${COMPOSE_PROJECT_NAME:-drupal11}_proxy
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.rule=${SITE_HOST_RULE:-HostRegexp(`^app\.localhost$`)}
       - ${PROXY_CERTRESOLVER:+traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.tls.certresolver=$PROXY_CERTRESOLVER}
       - ${PROXY_ENTRYPOINTS:+traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.entrypoints=$PROXY_ENTRYPOINTS}
@@ -265,7 +264,7 @@ services:
       # Held through its own stop too, as the app's router.
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.middlewares=hold@file
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-alwaysup.loadbalancer.server.port=8080
-    networks: [default, traefik]
+    networks: [default, proxy]
 
   # GoAccess for `devopsy goaccess`: it reads the access log files Caddy
   # writes in mnt/logs, as their owner, and prints a report. Never started
@@ -309,11 +308,8 @@ services:
       - no-new-privileges
 
 networks:
-  # Named from the project, so alwaysup's app.<project>_default upstream
-  # holds under plain docker compose too (the default would be the
-  # directory's name).
+  # What is only here, like the database, has no way out.
   default:
-    name: ${COMPOSE_PROJECT_NAME:-drupal11}_default
-  traefik:
-    name: traefik
-    external: true
+    internal: true
+  proxy:
+    name: ${COMPOSE_PROJECT_NAME:-drupal11}_proxy
