@@ -265,7 +265,7 @@ services:
       # Held through its own stop too, as the app's router.
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-alwaysup.middlewares=hold@file
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-alwaysup.loadbalancer.server.port=8080
-    networks: [private, proxy]
+    networks: [proxy]
 
   # GoAccess for `devopsy goaccess`: it reads the access log files Caddy
   # writes in mnt/logs, as their owner, and prints a report. Never started
