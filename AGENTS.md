@@ -104,6 +104,7 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 - Files Caddy serves get the headers Drupal's `web/.htaccess` gives them under Apache, the version the template ships (`docker/Caddyfile`, after the php handler): a year's `max-age`, `immutable` too for CSS and JS aggregates (named by a hash of their files), and `nosniff`.
 - A static file's `Cache-Control` is never `public`: a shared cache would keep, and serve to anyone, a file a request with basic auth got.
 - SVG and HTML files are served with `Content-Security-Policy: script-src 'none'`: an uploaded one opened directly would otherwise run its scripts on the site's domain.
+- HSTS is the app router's own `headers` middleware, from labels in `compose.yaml` (`<project>-hsts`, a year, no `includeSubDomains` or preload), never also sent by Traefik or the app: a browser takes only the first of two such headers, so the policy would be whichever layer came first.
 - No symlinks in public files: the entrypoint removes every one under `storage/public` at each start, saying which (`docker/entrypoint`), and fails when it cannot, since Caddy's file_server follows links and has no setting not to, so a link the app was tricked into writing would serve its target anonymously.
 - Accepted: a link is served between its creation and the next start.
 - `public/` and `private/` themselves, when links, are removed, said, and made again as directories before anything tests them, since `-e`, `-d` and `-w` follow links.
@@ -191,6 +192,12 @@ for u in /sites/default/files/css/css_t.css /core/misc/drupal.js /core/misc/logo
   echo "$u"; devopsy exec -T app curl -sI "http://localhost:8080$u" | grep -i -E '^HTTP|cache-control|nosniff|content-security'
 done
 devopsy exec -T app sh -c 'cd storage/public && rm -rf css/css_t.css t'
+```
+
+On a server, the site's HTTPS answer carries `Strict-Transport-Security: max-age=31536000`:
+
+```sh
+curl -sI https://<host>/ | grep -i strict-transport-security
 ```
 
 - Files whose names only contain `.php` are served (200): `my.pharmacy.jpg` and `report.php.pdf` in `storage/public`, and an image style derivative of the first, requested twice (the second from the file Drupal wrote).

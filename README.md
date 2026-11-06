@@ -87,7 +87,7 @@ the app's and MariaDB's users, so you cannot delete them yourself:
 - [Running the site](docs/running.md): build mode, static files'
   caching, settings, the access log, updates, configuration and rollbacks.
 - [Security](docs/security.md): the image, privileges, what is read-only,
-  ownership and basic auth.
+  HSTS, ownership and basic auth.
 - [Child environments](docs/children.md): syncs from prod, dumps,
   sanitizing, inherited settings and the data labels.
 - [Visitors during stops](docs/stops.md): `alwaysup` and the hold.

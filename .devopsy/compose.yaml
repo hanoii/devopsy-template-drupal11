@@ -94,7 +94,16 @@ services:
       # visitor whose request meets the closed port of a stopping app (its
       # 502, before Traefik drops the router), and sends them on once the
       # app answers. Drop it to opt out.
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=hold@file
+      # <project>-hsts: Strict-Transport-Security for a year, so a browser
+      # that saw the site over HTTPS never tries plain HTTP first, where
+      # the redirect could be intercepted. A broken certificate can then no
+      # longer be clicked through. No includeSubDomains: the domain's other
+      # hosts may be other sites. Traefik sends it on HTTPS requests only,
+      # so never behind a Cloudflare Tunnel, whose own HSTS setting is
+      # there for that. Nothing else sends it (a Drupal module, Caddy).
+      # Drop it from the list to opt out.
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-app}-hsts.headers.stsseconds=31536000
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}.middlewares=hold@file,${COMPOSE_PROJECT_NAME:-app}-hsts
       # While this container is stopped, recreating or unhealthy, Traefik
       # has no router for it and the alwaysup service's (below, priority
       # 2) answers instead: it waits for the app and streams its answer,

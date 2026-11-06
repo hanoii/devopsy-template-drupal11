@@ -54,6 +54,21 @@ Drupal's `.htaccess` sets it. An SVG or HTML file also gets
 directly runs no script on the site's domain, and an SVG shown as an
 image is unchanged.
 
+## HSTS
+
+The app's router has a middleware of its own, `<project>-hsts`, that
+sends `Strict-Transport-Security: max-age=31536000` (`compose.yaml`): a
+browser that has seen the site over HTTPS goes straight to HTTPS for a
+year. It then cannot click through a broken certificate (for example a
+failed renewal), so the site is down for it until the certificate is
+fixed. There is no `includeSubDomains`, since the domain's other hosts
+may be other sites. To opt out, drop it from the router's middlewares.
+Nothing else should send the header, a Drupal module included.
+
+Traefik adds it to HTTPS requests only. Behind a Cloudflare Tunnel,
+requests reach Traefik over plain HTTP, so Cloudflare's own HSTS setting
+is the one to use.
+
 Symbolic links in public files are removed. Caddy follows links, so one
 written into public files would serve its target (private files, the
 access log) to anyone, across releases. Drupal never creates them. At
