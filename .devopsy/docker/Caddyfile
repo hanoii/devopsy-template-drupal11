@@ -141,6 +141,26 @@
 
 		@phpFiles path *.php *.php/*
 		php @phpFiles
+
+		# Only files from here on: PHP answered its own requests above,
+		# with Drupal's headers. What web/.htaccess gives them under Apache
+		# (mod_expires, mod_headers): a year in browsers, and no sniffing.
+		# CSS and JS aggregates are named by a hash of the files they hold,
+		# so they never change: immutable, not even revalidated on a
+		# reload. A missing one was rewritten to index.php, which builds
+		# it. Never public: a shared cache would then keep, and serve to
+		# anyone, a file a request with basic auth got. ? sets the year
+		# only when no Cache-Control is set.
+		@aggregates path /sites/default/files/css/* /sites/default/files/js/*
+		header @aggregates Cache-Control "max-age=31536000, immutable"
+		header ?Cache-Control max-age=31536000
+		header X-Content-Type-Options nosniff
+		# An SVG or HTML file opened directly is a document that runs its
+		# scripts on the site's domain: an uploaded one runs none. Nothing
+		# changes for an SVG shown as an image. In any directory and any
+		# case: a leading * matches the path's end, and paths ignore case.
+		@documents path *.svg *.svgz *.htm *.html *.xhtml
+		header @documents Content-Security-Policy "script-src 'none'"
 		file_server
 	}
 }

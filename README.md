@@ -84,8 +84,8 @@ the app's and MariaDB's users, so you cannot delete them yourself:
 
 ## Documentation
 
-- [Running the site](docs/running.md): build mode, settings, the access
-  log, updates, configuration and rollbacks.
+- [Running the site](docs/running.md): build mode, static files'
+  caching, settings, the access log, updates, configuration and rollbacks.
 - [Security](docs/security.md): the image, privileges, what is read-only,
   ownership and basic auth.
 - [Child environments](docs/children.md): syncs from prod, dumps,

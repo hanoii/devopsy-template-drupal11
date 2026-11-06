@@ -48,6 +48,12 @@ directly in `core/` (`install.php`, `rebuild.php`, `authorize.php`).
 `autoload.php`, and any PHP in modules, themes, libraries or core's
 tests, gets a 403.
 
+Files Caddy serves itself carry `X-Content-Type-Options: nosniff`, as
+Drupal's `.htaccess` sets it. An SVG or HTML file also gets
+`Content-Security-Policy: script-src 'none'`: one uploaded and opened
+directly runs no script on the site's domain, and an SVG shown as an
+image is unchanged.
+
 Symbolic links in public files are removed. Caddy follows links, so one
 written into public files would serve its target (private files, the
 access log) to anyone, across releases. Drupal never creates them. At

@@ -17,6 +17,15 @@ code, so most releases rebuild only the code layer, well under 1 MB here.
 Code changes need a release. OPcache never revalidates; the code cannot
 change. Add modules with composer, then release.
 
+## Static files
+
+Files Caddy serves itself get the caching Drupal's `web/.htaccess` gives
+them under Apache: browsers keep them a year (`max-age=31536000`), and
+CSS and JS aggregates, named by a hash of the files they hold, are also
+`immutable`, never revalidated. Never `public`, so a shared cache such as
+a CDN keeps nothing a request with basic auth got. PHP's responses keep
+Drupal's own headers.
+
 ## Settings
 
 Drupal's settings (`web/sites/default/settings.php`) come from the
