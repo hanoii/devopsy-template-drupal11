@@ -1,44 +1,55 @@
 #!/bin/sh
 # The status capability (devopsy-cli's docs/capabilities.md): what
 # `devopsy --status` adds after the containers, with the project's
-# environment loaded. One fact per line.
+# environment loaded. One fact per line, `<level>\t<key>\t<value>`, its
+# level info or warning (which makes --status exit 3), then a command to
+# copy when there is one; devopsy aligns and colors them.
 set -eu
+
+# fact <level> <key> <value> [<fix>]
+fact() {
+  printf '%s\t%s\t%s' "$1" "$2" "$3"
+  [ $# -lt 4 ] || printf '\t%s' "$4"
+  echo
+}
 
 if [ -n "${SITE_URLS:-}" ]; then
   for url in $SITE_URLS; do
-    echo "url          $url"
+    fact info url "$url"
   done
 else
-  echo "url          no URL: no base domain or PROXY_DOMAINS"
+  fact warning url "no URL: no base domain or PROXY_DOMAINS"
 fi
 # The login in front of the site, in full: this is where to look it up.
 if [ -n "${SITE_BASIC_AUTH:-}" ]; then
-  echo "basic auth   $SITE_BASIC_AUTH"
+  fact info "basic auth" "$SITE_BASIC_AUTH"
 else
-  echo "basic auth   none, the site is open"
+  fact info "basic auth" "none, the site is open"
 fi
 if [ -f "$DEVOPSY_PROJECT_DIR/mnt/maintenance/on" ]; then
-  echo "maintenance  on (devopsy maintenance off brings the site back)"
+  fact warning maintenance "on, the site shows its maintenance page" "devopsy maintenance off"
 else
-  echo "maintenance  off"
+  fact info maintenance off
 fi
-# When the app runs: the PHP it runs (FrankenPHP's own, which serves the
-# site; an advisory's fix arrives with the next release, which builds on
-# the base image's current tag), then Drupal's version and whether it is
-# installed.
-if devopsy ps --services --status running 2>/dev/null | grep -qx app; then
-  # "FrankenPHP v1.13.0 PHP 8.4.27 Caddy v2.11.7 h1:...".
-  php=$(devopsy exec -T app frankenphp version </dev/null 2>/dev/null |
-    sed -n 's/^FrankenPHP v\([^ ]*\) PHP \([^ ]*\) .*/\2 (FrankenPHP \1)/p' || true)
-  if [ -n "$php" ]; then
-    echo "php          $php"
-  fi
-  version=$(devopsy exec -T app drush status --field=drupal-version </dev/null 2>/dev/null || true)
-  if [ -n "$version" ]; then
-    if devopsy exec -T app drush status --field=bootstrap </dev/null 2>/dev/null | grep -q Successful; then
-      echo "drupal       $version, installed"
-    else
-      echo "drupal       $version, not installed (drush site:install)"
+# When the app runs (devopsy says which services do): the PHP it runs
+# (FrankenPHP's own, which serves the site; an advisory's fix arrives
+# with the next release, which builds on the base image's current tag),
+# then Drupal's version and whether it is installed.
+case " ${DEVOPSY_STATUS_RUNNING:-} " in
+  *" app "*)
+    # "FrankenPHP v1.13.0 PHP 8.4.27 Caddy v2.11.7 h1:...".
+    php=$(devopsy exec -T app frankenphp version </dev/null 2>/dev/null |
+      sed -n 's/^FrankenPHP v\([^ ]*\) PHP \([^ ]*\) .*/\2 (FrankenPHP \1)/p' || true)
+    if [ -n "$php" ]; then
+      fact info php "$php"
     fi
-  fi
-fi
+    version=$(devopsy exec -T app drush status --field=drupal-version </dev/null 2>/dev/null || true)
+    if [ -n "$version" ]; then
+      if devopsy exec -T app drush status --field=bootstrap </dev/null 2>/dev/null | grep -q Successful; then
+        fact info drupal "$version, installed"
+      else
+        fact info drupal "$version, not installed" "devopsy drush site:install"
+      fi
+    fi
+    ;;
+esac
