@@ -2,8 +2,9 @@
 # The status capability (devopsy-cli's docs/capabilities.md): what
 # `devopsy --status` adds after the containers, with the project's
 # environment loaded. One fact per line, `<level>\t<key>\t<value>`, its
-# level info or warning (which makes --status exit 3), then a command to
-# copy when there is one; devopsy aligns and colors them.
+# level info, highlight (shown in bold) or warning (which makes --status
+# exit 3), then a command to copy when there is one; devopsy aligns and
+# colors them.
 set -eu
 
 # fact <level> <key> <value> [<fix>]
@@ -15,16 +16,16 @@ fact() {
 
 if [ -n "${SITE_URLS:-}" ]; then
   for url in $SITE_URLS; do
-    fact info url "$url"
+    fact highlight url "$url"
   done
 else
   fact warning url "no URL: no base domain or PROXY_DOMAINS"
 fi
 # The login in front of the site, in full: this is where to look it up.
 if [ -n "${SITE_BASIC_AUTH:-}" ]; then
-  fact info "basic auth" "$SITE_BASIC_AUTH"
+  fact highlight "basic auth" "$SITE_BASIC_AUTH"
 else
-  fact info "basic auth" "none, the site is open"
+  fact highlight "basic auth" "none, the site is open"
 fi
 if [ -f "$DEVOPSY_PROJECT_DIR/mnt/maintenance/on" ]; then
   fact warning maintenance "on, the site shows its maintenance page" "devopsy maintenance off"
