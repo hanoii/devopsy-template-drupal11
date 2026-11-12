@@ -3,8 +3,10 @@
 # Drupal on FrankenPHP (Caddy + PHP 8.4), built on the server by
 # `devopsy @<target> --release` (build mode, devopsy's default). Code is owned by root and
 # read-only; the only writable paths at runtime are /tmp and the storage and
-# logs mounts (compose.yaml). No USER here: compose.yaml's user: runs the app
-# as APP_UID from its first process, with no capabilities.
+# logs mounts (compose.yaml). No USER and no user of its own here:
+# compose.yaml's user: runs the app as the environment's uid (DEVOPSY_UID)
+# from its first process, with no capabilities, and gives it HOME. A uid built
+# in would make each environment's image its own.
 #
 # The base is a floating tag on purpose: build mode builds with --pull, so
 # every release builds on its current image, PHP's security fixes included.
@@ -63,20 +65,13 @@ RUN rm -rf web/sites/default/files \
 ########################################
 FROM base AS app
 
-# Not root, and not 1000: that is the devopsy deploy user on servers, in the
-# docker group, so an escape would land as root-equivalent. The user only
-# names the UID (and gives it /tmp as home): compose.yaml runs the container
-# as ${APP_UID:-10001} and passes the same value here.
-ARG APP_UID=10001
-
 # The root filesystem is read-only at runtime: Caddy keeps its data and config
 # in /tmp, a tmpfs (see compose.yaml).
 ENV STORAGE_DIR=/app/storage \
   XDG_CONFIG_HOME=/tmp/caddy/config \
   XDG_DATA_HOME=/tmp/caddy/data
 
-RUN useradd --uid ${APP_UID} --user-group --no-create-home --home-dir /tmp --shell /bin/bash app \
-  && mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 # No privilege to gain: the app runs on 8080 without capabilities
 # (compose.yaml drops them all), so the binary's file capability for low
