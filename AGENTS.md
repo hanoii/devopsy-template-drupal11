@@ -87,8 +87,8 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 - No container has privilege: each runs as its own numeric UID from its first process (`user:` in `compose.yaml`), with `cap_drop: [ALL]` and `no-new-privileges`, read-only where the image allows, since the site must hold up with the app fully compromised (its code finds nothing to escalate with, and a `--user 0` shell is a root without capabilities).
 - A capability comes back only with a stated reason (alwaysup's `NET_BIND_SERVICE`, below).
 - Images built here carry no setuid or setgid binaries and no file capabilities.
-- The app's UID is `APP_UID` (10001 by default), never 0 and never 1000 (the deploy user, in the docker group), and every place that names it reads the variable: the app's `user:` and build argument, alwaysup, goaccess (the access log is mode 600) and jq.
-- Ownership is devopsy's, through `devopsy.mnt.owner=user` on each service that writes an entry of `mnt` (`storage` and `logs` the app's, `database` 999's), so the data's owner follows the service's `user:` and the two never drift apart.
+- Every container runs as the environment's uid (`user: "${DEVOPSY_UID:?}:${DEVOPSY_UID:?}"`, never a default), the database too, never 0 and never the deploy user (in the docker group), and every place that names it reads the variable: the services' `user:` and the database's `/run/mysqld` tmpfs.
+- Ownership is devopsy's, through `devopsy.mnt.owner=user` on each service that writes an entry of `mnt` (`storage`, `logs` and `database`, the environment's uid's), so the data's owner follows the service's `user:` and the two never drift apart.
 - Nothing in an image chowns or needs root to start.
 - Entries written from the host (`maintenance`, by `deploy`) have no owner label and stay the deploy user's.
 - Everything written at runtime goes in `mnt` or `/tmp`: the release tree is read-only and goes with the next release.
@@ -121,7 +121,7 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 ## Images
 
 - No `USER` in the Dockerfile, `user:` in compose, so the image still runs as root for whoever wants that (a debugging `docker run`), and the entrypoint does not refuse root.
-- The `app` user exists only to name the UID and give it `/tmp` as home (Docker sets `HOME` from `/etc/passwd` for a numeric `user:`).
+- The image names no user and no uid: `HOME=/tmp` comes from compose (Docker sets `HOME` from `/etc/passwd` for a numeric `user:`, `/` without an entry), and a uid built in would make each environment's image its own.
 - FrankenPHP's file capability is removed (`setcap -r`), and the app listens on 8080: execve refuses a binary whose file capabilities the bounding set lacks, so with `cap_drop: [ALL]` the upstream binary's `cap_net_bind_service=ep` keeps it from starting.
 - alwaysup runs the upstream Caddy image unchanged, whose binary carries the same capability, hence its `cap_add: [NET_BIND_SERVICE]`.
 - The entrypoint only hashes the basic-auth password, removes symlinks from public files and in place of `public/` and `private/`, and creates `public/` and `private/`.
@@ -129,8 +129,8 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 - `drush` is a wrapper for `--root` only.
 - Never drush as root (`--user 0`, `--shell app --user root`): what it writes (compiled Twig in `/tmp/php`, files in storage) is root's, which the app cannot replace, and a root without capabilities cannot write into the app's own directories at all; run it as the app, `exec`'s default user.
 - `accesslog` prints no control characters: the app writes the log and a request's URL can hold any byte, so jq strips them (C0, DEL and C1) from every field before they reach the operator's terminal.
-- MariaDB runs as 999 from the start: the official image's entrypoint chowns its datadir only when started as root, and the owner label makes the datadir 999's.
-- MariaDB is read-only too: it writes only the datadir, `/run/mysqld` (socket and pid file) and `/tmp`, both tmpfs, the first given to 999 with tmpfs options (`uid=999,gid=999`), since a tmpfs is root's otherwise and Compose's long syntax has no owner.
+- MariaDB runs as the environment's uid from the start: the official image's entrypoint chowns its datadir only when started as root, and the owner label makes the datadir that uid's.
+- MariaDB is read-only too: it writes only the datadir, `/run/mysqld` (socket and pid file) and `/tmp`, both tmpfs, the first given to the environment's uid with tmpfs options (`uid=${DEVOPSY_UID:?},gid=${DEVOPSY_UID:?}`), since a tmpfs is root's otherwise and Compose's long syntax has no owner.
 - MariaDB's image keeps its setuid binaries (not ours to rebuild): without capabilities and with `no-new-privileges` they give nothing.
 - MariaDB's warning that `io_uring_queue_init()` failed with EPERM is Docker's seccomp profile, not the hardening; it falls back.
 - `disable_functions` for web requests is documented, commented out, never enforced (`docker/Caddyfile`): it blocks the shell behind most exploits and breaks modules that shell out in a request, the site's choice.
@@ -150,7 +150,7 @@ The hardening, on a running environment (`devopsy @<target> exec -T` for one on 
 ```sh
 devopsy exec -T app grep -E 'Cap(Eff|Bnd)|NoNewPrivs' /proc/1/status       # zeros, 1
 devopsy exec -T database grep -E 'Cap(Eff|Bnd)|NoNewPrivs' /proc/1/status  # zeros, 1
-devopsy exec -T --user 0 app sh -c 'chown 10001 /tmp'                      # fails
+devopsy exec -T --user 0 app sh -c 'chown 1 /tmp'                          # fails
 devopsy exec -T app find / -xdev -perm /6000 -type f                       # nothing
 ```
 

@@ -2,7 +2,7 @@
 
 ## alwaysup
 
-`alwaysup` is a small Caddy (as `APP_UID`, read-only,
+`alwaysup` is a small Caddy (as the app's uid, read-only,
 `.devopsy/docker/alwaysup/Caddyfile`) with the app's rule, on a router at
 priority 2, below the app's. Traefik sends visitors straight to the app
 while its container runs, and to `alwaysup` only while the app's router

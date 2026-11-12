@@ -8,16 +8,17 @@ services:
     build:
       context: ..
       dockerfile: .devopsy/Dockerfile
-      args:
-        APP_UID: ${APP_UID:-10001}
     restart: unless-stopped
-    # No privilege at all, from the first process: its own UID (APP_UID,
-    # never root, never 1000, the deploy user on servers), no capabilities
-    # (it listens on 8080; the Dockerfile removes FrankenPHP's file
-    # capability and every setuid binary) and none to gain. `compose exec`
-    # runs as this user too, and as --user 0 is a root without
-    # capabilities. devopsy gives the mounts to it (devopsy.mnt.owner).
-    user: ${APP_UID:-10001}:${APP_UID:-10001}
+    # No privilege at all, from the first process: the environment's own uid
+    # (DEVOPSY_UID, which devopsy gives every environment on a server and no
+    # other environment's containers share, so an escape reaches nothing of
+    # theirs through /proc; never root, never the deploy user), no
+    # capabilities (it listens on 8080; the Dockerfile removes FrankenPHP's
+    # file capability and every setuid binary) and none to gain. `compose
+    # exec` runs as this user too, and as --user 0 is a root without
+    # capabilities. devopsy gives the mounts to it (devopsy.mnt.owner). The
+    # image names no user: HOME is /tmp, set below.
+    user: "${DEVOPSY_UID:?}:${DEVOPSY_UID:?}"
     cap_drop:
       - ALL
     security_opt:
@@ -28,6 +29,9 @@ services:
     tmpfs:
       - /tmp
     environment:
+      # Docker takes HOME from the image's passwd for a numeric user, which
+      # names none: / otherwise, read-only.
+      HOME: /tmp
       DB_HOST: database
       DB_NAME: drupal
       DB_USER: drupal
@@ -152,21 +156,22 @@ services:
     # version, which a release takes.
     image: mariadb:${MARIADB_VERSION:-11.8}
     restart: unless-stopped
-    # As the image's mysql user (999) from the first process, without
+    # As the environment's uid, the app's, from the first process, without
     # capabilities: its entrypoint only starts as root to chown the
     # datadir, which devopsy does instead (devopsy.mnt.owner below), and
-    # skips that when started as its user.
-    user: "999:999"
+    # skips that when started as any other user. Never the image's own 999,
+    # every MariaDB's on the server.
+    user: "${DEVOPSY_UID:?}:${DEVOPSY_UID:?}"
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges
     read_only: true
     # The only writable paths: the datadir (below), /run/mysqld (its
-    # socket and pid file, the mysql user's: a tmpfs is root's unless told
+    # socket and pid file, its user's: a tmpfs is root's unless told
     # otherwise) and /tmp.
     tmpfs:
-      - /run/mysqld:uid=999,gid=999,mode=755
+      - /run/mysqld:uid=${DEVOPSY_UID:?},gid=${DEVOPSY_UID:?},mode=755
       - /tmp
     environment:
       MARIADB_DATABASE: drupal
@@ -225,12 +230,12 @@ services:
   # requests here while the app's router is gone: no middleman otherwise,
   # and nothing needed from the server's Traefik. No devopsy.data label,
   # and no depends_on on the app (it would stop with it): copies never
-  # stop it, and never copy the flag. As APP_UID, read-only;
+  # stop it, and never copy the flag. As the app's uid, read-only;
   # Caddy's directories are tmpfs, nothing is persisted.
   alwaysup:
     image: caddy:2-alpine
     restart: unless-stopped
-    user: ${APP_UID:-10001}:${APP_UID:-10001}
+    user: "${DEVOPSY_UID:?}:${DEVOPSY_UID:?}"
     read_only: true
     # A tmpfs takes the mode of the directory it covers: /tmp is world
     # writable in the image, /data and /config are root's, so Caddy's
@@ -283,7 +288,7 @@ services:
     profiles: [tools]
     image: allinurl/goaccess:1.12
     # The access log's owner: the files are mode 600.
-    user: ${APP_UID:-10001}:${APP_UID:-10001}
+    user: "${DEVOPSY_UID:?}:${DEVOPSY_UID:?}"
     # Docker's own TERM for a terminal is xterm, 8 colors, where GoAccess
     # draws its time columns in black: unreadable on a dark background.
     # With 256 colors it uses a palette that shows on any.
@@ -309,7 +314,7 @@ services:
   jq:
     profiles: [tools]
     image: ghcr.io/jqlang/jq:1.8.1
-    user: ${APP_UID:-10001}:${APP_UID:-10001}
+    user: "${DEVOPSY_UID:?}:${DEVOPSY_UID:?}"
     network_mode: none
     read_only: true
     cap_drop:

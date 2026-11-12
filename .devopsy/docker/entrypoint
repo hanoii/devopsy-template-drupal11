@@ -1,6 +1,6 @@
 #!/bin/sh
 # Container entrypoint. It runs as whatever user the container runs as
-# (compose.yaml's user:, APP_UID), never needing root or a capability:
+# (compose.yaml's user:, DEVOPSY_UID), never needing root or a capability:
 # devopsy gives the storage and logs mounts to that user before the
 # release starts it (compose.yaml's devopsy.mnt.owner).
 set -eu

@@ -9,10 +9,12 @@ ports below 1024 is removed, and the app listens on 8080.
 
 ## No privilege
 
-Every container runs as a user of its own from its first process, never
-as root. The app, alwaysup and the tools run as `APP_UID`, 10001 by
-default (never 1000, the deploy user on devopsy servers), and MariaDB as
-its image's user, 999. Each drops every capability and sets
+Every container runs as the environment's own uid from its first
+process, never as root: `DEVOPSY_UID`, which devopsy gives each
+environment on a server and no other environment's containers share, so
+a process escaped from another site's container reaches nothing of this
+one's through `/proc`. The app, alwaysup, the tools and MariaDB all run
+as it. Each drops every capability and sets
 `no-new-privileges`; alwaysup keeps the one capability its upstream Caddy
 binary needs to start. A compromised app finds no way to escalate:
 even `devopsy @prod --shell app --user root` is a root without
@@ -23,9 +25,8 @@ Never run drush as root. It leaves root's files in `/tmp/php` and in
 storage, which the app cannot replace. `devopsy @prod drush` runs as the
 app by default ([Ownership](#ownership)).
 
-`APP_UID` is also the image's build argument, so changing it takes a
-release. `--reload` refuses the change and names the variable, since the
-image would keep the old user's files.
+The image names no user and no uid, so every environment runs the same
+image on its own uid.
 
 ## What is read-only
 
@@ -90,7 +91,8 @@ devopsy sets the mounts' owners. `devopsy.mnt.owner=user` on a service
 (`compose.yaml`) makes it create that service's entries of `mnt` and give
 them to the service's `user:` at every release, regardless of the owner
 their files arrived with (a sync, an import, a copy by hand): `storage` and
-`logs` to `APP_UID`, `database` to 999. Nothing starts as root to chown.
+`logs` and `database` to the environment's uid. Nothing starts as root to
+chown.
 This needs a devopsy that takes `user` as the label's value, on the
 server too (`devopsy @<server> --upgrade`).
 

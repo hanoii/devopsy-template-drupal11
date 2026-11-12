@@ -6,3 +6,4 @@ History, not rules: AGENTS.md's Images win where they differ.
 - MariaDB as 999 was checked on 11.8.9 with no capabilities: a first start on an empty entry, a restart, an upgrade start from 11.4 with `MARIADB_AUTO_UPGRADE`, and the custom export and import; read-only, a first start, a restart and a recreate, the healthcheck, `mariadb-dump`, and `--export`/`--import database` with `volumes` and `custom` (then `mnt` and `stream`).
 - `disable_functions` in `php_ini` applies to the web server only (checked: a web request reports them disabled, `php -r` in the same container none).
 - `php.ini`'s narrowing came from the php.net advisory of October 2026 (CVE-2026-109618 and CVE-2026-109619, fixed in 8.4.27).
+- The image's `app` user (`useradd --uid ${APP_UID}`) went on 2026-11-11: it was left from when the image ran as root and Caddy as another user, and with a uid per environment a build argument would make every environment's image its own. `HOME=/tmp` moved to compose.
