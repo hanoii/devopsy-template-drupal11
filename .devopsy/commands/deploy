@@ -1,8 +1,8 @@
 #!/bin/sh
 ## Description: Build, start and update the site (run on the server by release)
 # The environments' release and rollback run step (config.yaml), run on the
-# server by `devopsy @<target> --release` and `--rollback`, and locally by
-# `devopsy --release`.
+# server by `devopsy @<target> --release` and `--rollback`, and without a
+# target by `devopsy --release`.
 #
 # The release's prepare step generated missing secrets (secrets). It never installs the site:
 # browse to it for Drupal's installer, or run `devopsy drush site:install`.
@@ -15,7 +15,7 @@ set -eu
 mkdir -p "$DEVOPSY_PROJECT_DIR/mnt/maintenance"
 
 # devopsy built the image before it runs this (a release, on a server or
-# locally with devopsy --release): here it only starts.
+# in place with devopsy --release): here it only starts.
 devopsy up -d --wait --remove-orphans
 # A deploy ends maintenance mode: the site is up again.
 rm -f "$DEVOPSY_PROJECT_DIR/mnt/maintenance/on"

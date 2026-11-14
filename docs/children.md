@@ -91,7 +91,7 @@ are the same `export` and `import` scripts:
 
 - `devopsy @prod --export database > dump.sql` gets a dump of prod while
   the site runs;
-- `devopsy --import database < dump.sql` loads it locally, with
+- `devopsy --import database < dump.sql` loads it into the local environment, with
   `DATA_DATABASE=custom` in `.devopsy/.env` too ([The
   labels](#the-labels));
 - `devopsy @dev --import database < dump.sql` loads it into a child, and

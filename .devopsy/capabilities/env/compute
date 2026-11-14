@@ -8,7 +8,7 @@
 #   SITE_HOST_RULE  a Traefik rule for every host, for the router's labels
 #   SITE_URL        https://<the first: the custom domain, else the wildcard>
 #   SITE_URLS       https://<host> for every host, space separated
-# Locally, without a base domain, the wildcard host is
+# Without a target or a base domain, the wildcard host is
 # <name>.localhost; in a release without one (DEVOPSY_TARGET is set) there
 # is none, and a release without PROXY_DOMAINS has no host at all.
 set -euf
