@@ -62,7 +62,7 @@ exported configuration, they run `drush deploy` (database updates,
 config import, cache rebuild and deploy hooks); until then, only the
 database updates.
 
-## Locally
+## Without a target
 
 With a local devopsy-template-traefik, the site is at
 `https://drupal11.localhost` (the config's project name):
