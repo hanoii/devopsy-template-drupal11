@@ -48,6 +48,15 @@ nothing changes. On a server with direct sites too, a tunneled site sets
 routers, the app's and `alwaysup`'s, take it. Uploads through Cloudflare
 are at most 100 MB on its Free and Pro plans.
 
+## Behind an HTTP proxy
+
+On a server behind an HTTP proxy, Docker gives every container the proxy
+settings of the deploy user's `~/.docker/config.json`
+([devopsy-cli's servers doc](https://github.com/hanoii/devopsy-cli/blob/main/docs/servers.md#behind-an-http-proxy)).
+The site needs nothing listed there: `alwaysup` reaches the app directly
+(its own `NO_PROXY`), and the healthcheck never uses the proxy. The app's
+own requests to the internet go through it.
+
 ## The access log
 
 Caddy logs each request as a JSON line, to the container's output

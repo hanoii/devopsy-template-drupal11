@@ -56,8 +56,10 @@ services:
         condition: service_healthy
     healthcheck:
       # Caddy only: Drupal answers with a redirect until it is installed.
-      # HEALTHCHECK_PATH, the app's environment above.
-      test: [CMD-SHELL, 'curl -fsS -o /dev/null "http://localhost:8080$$HEALTHCHECK_PATH"']
+      # HEALTHCHECK_PATH, the app's environment above. Never through an
+      # HTTP proxy Docker hands the container: curl sends localhost there
+      # too unless the server's list names it.
+      test: [CMD-SHELL, 'curl --noproxy "*" -fsS -o /dev/null "http://localhost:8080$$HEALTHCHECK_PATH"']
       interval: 10s
       start_period: 30s
       start_interval: 1s
@@ -246,6 +248,12 @@ services:
     environment:
       ALWAYSUP_WAIT: ${ALWAYSUP_WAIT:-60s}
       ALWAYSUP_UPSTREAM: app:8080
+      # Behind an HTTP proxy Docker hands every container the server's
+      # list, which never names app, and Caddy would send its requests for
+      # the app there. The app is all alwaysup reaches, so this replaces
+      # the list. Both cases: Go will read no_proxy first.
+      NO_PROXY: app
+      no_proxy: app
       XDG_DATA_HOME: /tmp/data
       XDG_CONFIG_HOME: /tmp/config
     healthcheck:
