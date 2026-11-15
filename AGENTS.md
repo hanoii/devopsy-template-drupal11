@@ -124,6 +124,7 @@ devopsy-template-drupal11 is Drupal 11 on FrankenPHP with MariaDB, run with [dev
 - The image names no user and no uid: `HOME=/tmp` comes from compose (Docker sets `HOME` from `/etc/passwd` for a numeric `user:`, `/` without an entry), and a uid built in would make each environment's image its own.
 - FrankenPHP's file capability is removed (`setcap -r`), and the app listens on 8080: execve refuses a binary whose file capabilities the bounding set lacks, so with `cap_drop: [ALL]` the upstream binary's `cap_net_bind_service=ep` keeps it from starting.
 - alwaysup runs the upstream Caddy image unchanged, whose binary carries the same capability, hence its `cap_add: [NET_BIND_SERVICE]`.
+- A container that calls another one over HTTP names it in its own `NO_PROXY` and `no_proxy` (alwaysup's `app`), and a check on its own loopback skips the proxy (`curl --noproxy`, busybox `wget -Y off`): behind an HTTP proxy Docker gives every container the server's list, which names no service, and a request for one would go to the proxy.
 - The entrypoint only hashes the basic-auth password, removes symlinks from public files and in place of `public/` and `private/`, and creates `public/` and `private/`.
 - The entrypoint fails with a message saying which, when `storage` is not a mount (missing on the read-only root, or in the container's own filesystem, gone at its next recreate), or `public/` or `private/` is not a directory, not creatable, or there and not writable by the container's user.
 - `drush` is a wrapper for `--root` only.
