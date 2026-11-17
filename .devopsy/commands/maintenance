@@ -13,7 +13,7 @@ case ${1:-} in
     mkdir -p "${flag%/*}"
     : >"$flag"
     devopsy stop app
-    echo "maintenance: on, the page is shown; devopsy maintenance off brings the site back" >&2
+    echo "maintenance: on, the page is shown; maintenance off brings the site back" >&2
     ;;
   off)
     devopsy up -d --wait app
